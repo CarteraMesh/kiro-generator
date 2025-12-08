@@ -1,0 +1,19 @@
+name: jobtaker
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  id-token: write
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  jobtaker:
+    uses: carteramesh/ci/.github/workflows/pr-review.yml@main
+    secrets: inherit
