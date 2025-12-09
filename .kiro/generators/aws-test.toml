@@ -26,7 +26,6 @@ autoApprove = []
 [mcpServers.awsbilling.env]
 FASTMCP_LOG_LEVEL = "ERROR"
 
-
 [mcpServers.awsdocs]
 command = "uvx"
 args = ["awslabs.aws-documentation-mcp-server@latest"]

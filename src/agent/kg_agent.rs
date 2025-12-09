@@ -2,14 +2,8 @@ use {
     super::hook::{Hook, HookTrigger},
     crate::{
         agent::{
-            Agent,
-            MergingAwsTool,
-            MergingExecuteShellTool,
-            MergingReadTool,
-            MergingWriteTool,
-            OriginalToolName,
-            ToolTarget,
-            mcp_config::MergingMcpServerConfig,
+            Agent, MergingAwsTool, MergingExecuteShellTool, MergingReadTool, MergingWriteTool,
+            OriginalToolName, ToolTarget, mcp_config::MergingMcpServerConfig,
         },
         merging_format::MergedSet,
         os::Fs,
@@ -194,7 +188,6 @@ impl From<&QgAgent> for Agent {
             }
         }
         let mut hooks: HashMap<HookTrigger, Vec<Hook>> = HashMap::new();
-        dbg!(&me.hooks);
         for (k, v) in me.hooks.iter() {
             hooks.insert(*k, v.values().cloned().collect());
         }

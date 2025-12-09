@@ -24,6 +24,7 @@ use {
 /// Container for all agent declarations from kg.toml files
 #[derive(Debug, Deserialize)]
 struct KgConfig {
+    #[serde(default)]
     agents: HashMap<String, serde_json::Value>,
 }
 
