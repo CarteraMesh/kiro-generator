@@ -18,7 +18,7 @@ name = "kg"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4", features = ["derive", "env"] }
+clap = { version = "4", features = ["cargo", "derive", "env"] }
 config = { version = "0.15" }
 dirs = "6"
 enum-iterator = "2.3.0"

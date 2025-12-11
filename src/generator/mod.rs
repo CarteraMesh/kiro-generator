@@ -275,6 +275,11 @@ impl Generator {
     }
 
     pub async fn write_all(&self, dry_run: bool) -> eyre::Result<Vec<QgAgent>> {
+        if dry_run {
+            tracing::info!("Validating config");
+        } else {
+            tracing::info!("Overwriting existing config");
+        }
         let agents = self.merge()?;
         for agent in &agents {
             self.write(agent, dry_run).await?;

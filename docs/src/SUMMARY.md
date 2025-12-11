@@ -3,6 +3,7 @@
 # Basics
 
 - [Intro](index.md)
+- [Install](install.md)
 - [Usage](usage.md)
 
 ## Examples
