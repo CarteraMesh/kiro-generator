@@ -41,9 +41,6 @@ fn init_tracing(debug: bool) {
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     let cli = commands::Cli::parse();
-    //    if cli.version {
-    //      println!("{} {}", clap::crate_name!(), clap::crate_version!());
-    //}
     let cmd = cli.command();
     if matches!(cmd, commands::Command::Version) {
         println!("{}", clap::crate_version!());
@@ -58,6 +55,18 @@ async fn main() -> eyre::Result<()> {
     let _guard = span.enter();
 
     let local_mode = cli.is_local(&cmd);
+    let global_mode = cli.is_global(&cmd);
+    if local_mode && global_mode {
+        return Err(eyre::eyre!("Cannot use both local and global modes"));
+    }
+    let (home_dir, home_config) = cli.config()?;
+    if global_mode {
+        debug!(
+            "changing working directory to {}",
+            home_dir.as_os_str().display()
+        );
+        std::env::set_current_dir(&home_dir)?;
+    }
     if local_mode {
         span.record("local_mode", true);
     }
@@ -65,12 +74,12 @@ async fn main() -> eyre::Result<()> {
     if dry_run {
         span.record("dry_run", true);
     }
-    let (global, local) = cli.configs();
 
+    let fs = Fs::new();
     let q_generator_config: Generator = if local_mode {
-        Generator::new(local.clone(), Fs::new())?
+        Generator::new(fs, false, None)?
     } else {
-        Generator::new(global, Fs::new())?
+        Generator::new(fs, global_mode, Some(home_config))?
     };
     debug!(
         "Loaded Agent Generator Config:\n{}",
@@ -79,7 +88,7 @@ async fn main() -> eyre::Result<()> {
 
     match cmd {
         commands::Command::Validate(_args) | commands::Command::Generate(_args) => {
-            q_generator_config.write_all(dry_run).await?;
+            q_generator_config.write_all(dry_run, local_mode).await?;
         }
         _ => {}
     };

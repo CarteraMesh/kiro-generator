@@ -2,8 +2,14 @@ use {
     super::hook::{Hook, HookTrigger},
     crate::{
         agent::{
-            Agent, MergingAwsTool, MergingExecuteShellTool, MergingReadTool, MergingWriteTool,
-            OriginalToolName, ToolTarget, mcp_config::MergingMcpServerConfig,
+            Agent,
+            MergingAwsTool,
+            MergingExecuteShellTool,
+            MergingReadTool,
+            MergingWriteTool,
+            OriginalToolName,
+            ToolTarget,
+            mcp_config::MergingMcpServerConfig,
         },
         merging_format::MergedSet,
         os::Fs,

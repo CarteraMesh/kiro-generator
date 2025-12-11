@@ -13,16 +13,16 @@ use {
         os::Fs,
     },
     config::Config,
-    eyre::Context,
+    eyre::{Context, eyre},
     serde::{Deserialize, Serialize},
     std::{
         collections::{HashMap, HashSet},
-        path::{Path, PathBuf},
+        path::PathBuf,
     },
 };
 
 /// Container for all agent declarations from kg.toml files
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 struct KgConfig {
     #[serde(default)]
     agents: HashMap<String, serde_json::Value>,
@@ -36,20 +36,33 @@ pub struct Generator {
     local_agents: HashSet<String>, // Agents defined in local kg.toml
     #[serde(skip)]
     fs: Fs,
-    #[serde(skip)]
-    has_local: bool,
 }
 
 impl Generator {
-    pub fn new(global_path: PathBuf, fs: Fs) -> eyre::Result<Self> {
-        let has_local = fs.exists(PathBuf::from(".kiro").join("generators").join("kg.toml"));
-        let (agents, local_agents) = Self::discover_agents(&global_path, &fs)?;
+    /// Read kg.toml file and collect all agents
+    pub fn new(fs: Fs, ignore_local: bool, global_path: Option<PathBuf>) -> eyre::Result<Self> {
+        if let Some(ref p) = global_path {
+            tracing::debug!("global config set to {}", p.as_os_str().display());
+            if !p.is_absolute() {
+                return Err(eyre!(
+                    "global path should be absolute, I received {}",
+                    p.as_os_str().display()
+                ));
+            }
+        }
+        let global_path = global_path.unwrap_or_default();
+        let span = tracing::info_span!(
+            "discover",
+            ignore = ignore_local,
+            global = fs.exists(&global_path)
+        );
+        let _guard = span.enter();
+        let (agents, local_agents) = Self::discover_agents(&fs, &global_path, ignore_local)?;
         Ok(Self {
             global_path,
             agents,
             local_agents,
             fs,
-            has_local,
         })
     }
 
@@ -64,18 +77,28 @@ impl Generator {
     /// * `.kiro/generators/kg.toml`
     /// ```
     fn discover_agents(
-        global_path: &Path,
         fs: &Fs,
+        global_path: &PathBuf,
+        ignore_local: bool,
     ) -> eyre::Result<(HashMap<String, QgAgent>, HashSet<String>)> {
-        let local_path: PathBuf = PathBuf::from(".kiro").join("generators").join("kg.toml");
-        if global_path.exists() {
-            tracing::debug!("Loading global kg.toml: {}", global_path.display());
+        let mut local_path: PathBuf = PathBuf::from(".kiro").join("generators").join("kg.toml");
+        if ignore_local {
+            local_path = PathBuf::default();
+        } else if fs.is_same(global_path, &local_path) {
+            tracing::debug!("global and local are the same");
+            local_path = PathBuf::default();
         }
-        if local_path.exists() {
+        if !fs.exists(&local_path) && !fs.exists(global_path) {
+            return Err(eyre!(
+                "no kg.toml configuration found in local or global locations \
+                 (ignore_local={ignore_local})",
+            ));
+        }
+        if !ignore_local && fs.exists(&local_path) {
             tracing::debug!("Loading local kg.toml: {}", local_path.display());
         }
         let builder = Config::builder().add_source(
-            config::File::from(global_path)
+            config::File::from(global_path.clone())
                 .required(false)
                 .format(config::FileFormat::Toml),
         );
@@ -90,25 +113,31 @@ impl Generator {
                 "could deserialize global path {}",
                 global_path.as_os_str().display()
             ))?;
-        let mut local_agents = HashSet::new();
-        // Parse local kg.toml with MergingTomlFormat to get agent names
-        let local_config: KgConfig = Config::builder()
-            .add_source(
-                config::File::from(local_path.clone())
-                    .required(false)
-                    .format(config::FileFormat::Toml),
-            )
-            .build()
-            .context(format!(
-                "could not process local path {}",
-                local_path.as_os_str().display()
-            ))?
-            .try_deserialize()
-            .context(format!(
-                "could deserialize local path {}",
-                local_path.as_os_str().display()
-            ))?;
-        local_agents.extend(local_config.agents.keys().cloned());
+        let local_config: KgConfig = if ignore_local {
+            KgConfig::default()
+        } else {
+            // Parse local kg.toml with MergingTomlFormat to get agent names
+            let local_config: KgConfig = Config::builder()
+                .add_source(
+                    config::File::from(local_path.clone())
+                        .required(false)
+                        .format(config::FileFormat::Toml),
+                )
+                .build()
+                .context(format!(
+                    "could not process local path {}",
+                    local_path.as_os_str().display()
+                ))?
+                .try_deserialize()
+                .context(format!(
+                    "could deserialize local path {}",
+                    local_path.as_os_str().display()
+                ))?;
+            local_config
+        };
+
+        let mut local_agents = HashSet::from_iter(local_config.agents.keys().cloned());
+        tracing::debug!("found {} local agents", local_agents.len());
         let mut all_agents_names: HashSet<String> =
             HashSet::with_capacity(global_agents.agents.keys().len() + local_agents.len());
         all_agents_names.extend(local_agents.clone());
@@ -117,7 +146,19 @@ impl Generator {
         let mut resolved_agents: HashMap<String, QgAgent> =
             HashMap::with_capacity(all_agents_names.len());
 
-        let global_dir = global_path.parent().unwrap();
+        let global_dir = if fs.exists(global_path) {
+            match global_path.parent() {
+                Some(parent) => parent.to_path_buf(),
+                None => {
+                    return Err(eyre!(
+                        "global path does not have parent directory {}",
+                        global_path.as_os_str().display()
+                    ));
+                }
+            }
+        } else {
+            PathBuf::default()
+        };
         for name in all_agents_names {
             let span = tracing::debug_span!("merge", agent = ?name);
             let _enter = span.enter();
@@ -138,15 +179,18 @@ impl Generator {
                     MergingTomlFormat,
                 ));
             }
-            // local .kiro/generators/<agent-name>.toml
-            let location = PathBuf::from(".kiro")
-                .join("generators")
-                .join(format!("{name}.toml"));
-            let content = fs.read_to_string_sync(&location).ok().unwrap_or_default();
-            if !content.is_empty() {
-                builder = builder.add_source(config::File::from_str(&content, MergingTomlFormat));
-                tracing::debug!("adding {}", location.as_os_str().display());
-                local_agents.insert(name.clone());
+            if !ignore_local {
+                // local .kiro/generators/<agent-name>.toml
+                let location = PathBuf::from(".kiro")
+                    .join("generators")
+                    .join(format!("{name}.toml"));
+                let content = fs.read_to_string_sync(&location).ok().unwrap_or_default();
+                if !content.is_empty() {
+                    builder =
+                        builder.add_source(config::File::from_str(&content, MergingTomlFormat));
+                    tracing::debug!("adding {}", location.as_os_str().display());
+                    local_agents.insert(name.clone());
+                }
             }
 
             // .kiro/generators/kg.toml
@@ -274,38 +318,47 @@ impl Generator {
         }
     }
 
-    pub async fn write_all(&self, dry_run: bool) -> eyre::Result<Vec<QgAgent>> {
+    pub async fn write_all(&self, dry_run: bool, local_mode: bool) -> eyre::Result<Vec<QgAgent>> {
         if dry_run {
             tracing::info!("Validating config");
         } else {
             tracing::info!("Overwriting existing config");
         }
-        let agents = self.merge()?;
+        let mut agents = self.merge()?;
+        agents.sort_by(|a, b| a.name.cmp(&b.name));
         for agent in &agents {
-            self.write(agent, dry_run).await?;
+            let span = tracing::info_span!("writer", agent = agent.name.as_str());
+            let _guard = span.enter();
+            self.write(agent, dry_run, local_mode).await?;
         }
         Ok(agents)
     }
 
-    pub async fn write(&self, agent: &QgAgent, dry_run: bool) -> eyre::Result<()> {
+    pub async fn write(
+        &self,
+        agent: &QgAgent,
+        dry_run: bool,
+        local_mode: bool,
+    ) -> eyre::Result<()> {
         let destination = self.destination_dir(&agent.name);
-        if destination.is_absolute() && self.has_local {
-            tracing::debug!("Skipping global agent [{}]", agent.name);
-            return Ok(());
-        }
+        let inherits = agent
+            .inherits
+            .iter()
+            .map(|a| a.as_str())
+            .collect::<Vec<_>>();
+        tracing::info!(
+            "Location {} inherits [{}]",
+            destination.display(),
+            inherits.join(",")
+        );
         if dry_run {
-            tracing::info!(
-                "writing agent config [{}] {}",
-                agent.name,
-                destination.display()
-            );
             return Ok(());
         }
 
         if !self.fs.exists(&destination) {
             self.fs.create_dir_all(&destination).await?;
         }
-        if self.has_local && !destination.is_absolute() {
+        if local_mode && !destination.is_absolute() {
             agent.write(&self.fs, destination).await?;
             return Ok(());
         }
@@ -346,8 +399,9 @@ mod tests {
     }
 
     async fn _discover_agents(fs: Fs) -> eyre::Result<()> {
-        let global = PathBuf::from(".kiro").join("generators").join("kg.toml");
-        let generator = Generator::new(global, fs.clone())?;
+        //        let global =
+        // PathBuf::from(".kiro").join("generators").join("kg.toml");
+        let generator = Generator::new(fs.clone(), false, None)?;
         assert!(!generator.agents.is_empty());
         assert_eq!(4, generator.agents.len());
         assert_eq!(4, generator.local_agents.len());
@@ -355,7 +409,7 @@ mod tests {
         if let Some(base) = generator.agents.get("base") {
             assert!(base.skeleton);
         }
-        let agents = generator.write_all(false).await?;
+        let agents = generator.write_all(false, true).await?;
 
         for agent in &agents {
             let destination = PathBuf::from(".kiro")

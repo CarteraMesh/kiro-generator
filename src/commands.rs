@@ -1,5 +1,6 @@
 use {
     clap::{Parser, Subcommand},
+    eyre::eyre,
     std::path::PathBuf,
 };
 
@@ -8,9 +9,6 @@ use {
 pub struct Cli {
     #[arg(long, global = true, short = 'v', short_alias = 'd', aliases = ["verbose", "debug"], default_value = "false")]
     pub debug: bool,
-    //  #[arg(short = 'V', long, help = "Print version")]
-    //    pub version: bool,
-    pub configs: Option<Vec<PathBuf>>,
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -72,12 +70,10 @@ impl Cli {
         }
     }
 
-    pub fn configs(&self) -> (PathBuf, PathBuf) {
-        let global = dirs::home_dir().map_or(
-            PathBuf::from(".kiro").join("generators").join("kg.toml"),
-            |dir| dir.join(".kiro").join("generators").join("kg.toml"),
-        );
-        let local = PathBuf::from(".kiro").join("generators").join("kg.toml");
-        (global, local)
+    /// Return home dir and ~/.kiro/generators/kg.toml
+    pub fn config(&self) -> eyre::Result<(PathBuf, PathBuf)> {
+        let home_dir = dirs::home_dir().ok_or(eyre!("cannot locate home directory"))?;
+        let cfg = home_dir.join(".kiro").join("generators").join("kg.toml");
+        Ok((home_dir, cfg))
     }
 }

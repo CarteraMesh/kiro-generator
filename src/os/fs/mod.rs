@@ -1,7 +1,7 @@
 use {
     std::{
         collections::HashMap,
-        fs::Permissions,
+        fs::{Metadata, Permissions},
         io,
         path::{Path, PathBuf},
         sync::{Arc, Mutex},
@@ -235,6 +235,31 @@ impl Fs {
                     Err(err) => Err(io::Error::new(io::ErrorKind::InvalidData, err)),
                 }
             }
+        }
+    }
+
+    /// Poor Man's check if two paths are the same
+    pub fn is_same(&self, a: impl AsRef<Path>, b: impl AsRef<Path>) -> bool {
+        match (self.stat(a), self.stat(b)) {
+            (Some(a_stat), Some(b_stat)) => {
+                match (
+                    a_stat.len() == b_stat.len(),
+                    a_stat.created().ok(),
+                    b_stat.created().ok(),
+                ) {
+                    (true, Some(g), Some(l)) => g == l,
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+
+    pub fn stat(&self, path: impl AsRef<Path>) -> Option<Metadata> {
+        match self {
+            Self::Real => std::fs::metadata(path).ok(),
+            Self::Chroot(root) => std::fs::metadata(append(root.path(), path)).ok(),
+            Self::Fake(_map) => None,
         }
     }
 
