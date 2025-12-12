@@ -8,7 +8,8 @@ pub const DEFAULT_AGENT_RESOURCES: &[&str] = &["file://README.md", "file://AGENT
 pub const DEFAULT_APPROVE: [&str; 0] = [];
 use {
     super::agent::hook::{Hook, HookTrigger},
-    eyre::eyre,
+    crate::Result,
+    color_eyre::eyre::eyre,
     serde::{Deserialize, Serialize},
     std::{
         collections::{HashMap, HashSet},
@@ -94,7 +95,7 @@ impl Agent {
         }
     }
 
-    pub fn validate(&self) -> eyre::Result<()> {
+    pub fn validate(&self) -> Result<()> {
         let schema: serde_json::Value = serde_json::from_str(crate::schema::SCHEMA)?;
         let validator = jsonschema::validator_for(&schema)?;
         let instance = serde_json::to_value(self)?;

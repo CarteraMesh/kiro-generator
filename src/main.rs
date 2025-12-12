@@ -7,9 +7,14 @@ mod schema;
 use {
     crate::{generator::Generator, os::Fs},
     clap::Parser,
+    std::path::PathBuf,
+    super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
     tracing::debug,
+    tracing_error::ErrorLayer,
+    tracing_subscriber::prelude::*,
 };
-pub type Result<T> = eyre::Result<T>;
+pub type Result<T> = color_eyre::Result<T>;
+
 pub const DEFAULT_AGENT_RESOURCES: &[&str] = &["file://AGENTS.md", "file://README.md"];
 
 fn init_tracing(debug: bool) {
@@ -21,25 +26,31 @@ fn init_tracing(debug: bool) {
     };
 
     if debug {
-        // Verbose format with timestamps and targets for debugging
-        tracing_subscriber::fmt()
-            .with_level(true)
-            .with_target(true)
-            .with_env_filter(filter)
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_level(true)
+                    .with_target(true),
+            )
+            .with(ErrorLayer::default())
             .init();
     } else {
-        // Clean format for CLI - no timestamps, no targets
-        tracing_subscriber::fmt()
-            .without_time()
-            .with_target(false)
-            .without_time()
-            .with_level(true)
-            .with_env_filter(filter)
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .without_time()
+                    .with_target(false)
+                    .with_level(true),
+            )
+            .with(ErrorLayer::default())
             .init();
     }
 }
 #[tokio::main]
-async fn main() -> eyre::Result<()> {
+async fn main() -> Result<()> {
+    color_eyre::install()?;
     let cli = commands::Cli::parse();
     let cmd = cli.command();
     if matches!(cmd, commands::Command::Version) {
@@ -56,9 +67,6 @@ async fn main() -> eyre::Result<()> {
 
     let local_mode = cli.is_local(&cmd);
     let global_mode = cli.is_global(&cmd);
-    if local_mode && global_mode {
-        return Err(eyre::eyre!("Cannot use both local and global modes"));
-    }
     let (home_dir, home_config) = cli.config()?;
     if global_mode {
         debug!(
@@ -76,10 +84,16 @@ async fn main() -> eyre::Result<()> {
     }
 
     let fs = Fs::new();
+    let local_config = PathBuf::from(".kiro").join("generators").join("kg.toml");
+    // let global_config: Option<PathBuf> = if global_mode {
+    //     Some(home_config)
+    // } else if fs.exists(&local_config) {
+    //     None
+    // }
     let q_generator_config: Generator = if local_mode {
-        Generator::new(fs, false, None)?
+        Generator::local(fs)?
     } else {
-        Generator::new(fs, global_mode, Some(home_config))?
+        Generator::new(fs, false, Some(home_config))?
     };
     debug!(
         "Loaded Agent Generator Config:\n{}",
@@ -88,7 +102,15 @@ async fn main() -> eyre::Result<()> {
 
     match cmd {
         commands::Command::Validate(_args) | commands::Command::Generate(_args) => {
-            q_generator_config.write_all(dry_run, local_mode).await?;
+            let results = q_generator_config.write_all(dry_run).await?;
+            let mut table = Table::new();
+            table
+                .load_preset(UTF8_FULL)
+                .apply_modifier(UTF8_ROUND_CORNERS)
+                .set_content_arrangement(ContentArrangement::Dynamic)
+//                .set_width(40)
+                .set_header(vec!["Agent", "Location"]).add_rows(results.into_iter().filter(|a| a.writable));
+            print!("{table}");
         }
         _ => {}
     };

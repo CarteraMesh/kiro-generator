@@ -1,11 +1,11 @@
 use {
     clap::{Parser, Subcommand},
-    eyre::eyre,
+    color_eyre::eyre::eyre,
     std::path::PathBuf,
 };
 
 #[derive(Parser)]
-#[command(name = "kg", long_version = clap::crate_version!(), about, long_about = "blasdh")]
+#[command(name = "kg", long_version = clap::crate_version!(), about, long_about = "")]
 pub struct Cli {
     #[arg(long, global = true, short = 'v', short_alias = 'd', aliases = ["verbose", "debug"], default_value = "false")]
     pub debug: bool,
@@ -17,11 +17,16 @@ pub struct Cli {
 pub struct Args {
     #[arg(
         long,
+        conflicts_with = "global",
         help = "Ignore global $HOME directory, use only what's in  .kiro/generators/kg.toml"
     )]
     pub local: bool,
-    #[arg(long, help = "Ignore local .kiro/generators/kg.toml config")]
-    #[arg(short = 'g', long, help = "Print version")]
+    #[arg(
+        short = 'g',
+        long,
+        conflicts_with = "local",
+        help = "Ignore local .kiro/generators/kg.toml config"
+    )]
     pub global: bool,
 }
 
@@ -71,7 +76,7 @@ impl Cli {
     }
 
     /// Return home dir and ~/.kiro/generators/kg.toml
-    pub fn config(&self) -> eyre::Result<(PathBuf, PathBuf)> {
+    pub fn config(&self) -> crate::Result<(PathBuf, PathBuf)> {
         let home_dir = dirs::home_dir().ok_or(eyre!("cannot locate home directory"))?;
         let cfg = home_dir.join(".kiro").join("generators").join("kg.toml");
         Ok((home_dir, cfg))

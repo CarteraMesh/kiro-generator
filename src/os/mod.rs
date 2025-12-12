@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
 mod fs;
-use eyre::Result;
 pub use fs::Fs;
 
+use crate::Result;
 const WINDOWS_USER_HOME: &str = "C:\\Users\\testuser";
 const UNIX_USER_HOME: &str = "/home/testuser";
 

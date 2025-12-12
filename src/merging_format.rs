@@ -21,7 +21,7 @@ pub struct MergingTomlFormat;
 pub struct MergedSet(pub HashSet<String>);
 
 impl<'de> Deserialize<'de> for MergedSet {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -39,7 +39,7 @@ impl<'de> Deserialize<'de> for MergedSet {
                 formatter.write_str("a map of strings or an array of strings")
             }
 
-            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            fn visit_map<M>(self, mut map: M) -> std::result::Result<Self::Value, M::Error>
             where
                 M: de::MapAccess<'de>,
             {
@@ -50,7 +50,7 @@ impl<'de> Deserialize<'de> for MergedSet {
                 Ok(MergedSet(set))
             }
 
-            fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
+            fn visit_seq<S>(self, mut seq: S) -> std::result::Result<Self::Value, S::Error>
             where
                 S: de::SeqAccess<'de>,
             {
@@ -67,7 +67,7 @@ impl<'de> Deserialize<'de> for MergedSet {
 }
 
 impl Serialize for MergedSet {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -114,7 +114,7 @@ impl Format for MergingTomlFormat {
         &self,
         uri: Option<&String>,
         text: &str,
-    ) -> Result<Map<String, Value>, Box<dyn Error + Send + Sync>> {
+    ) -> std::result::Result<Map<String, Value>, Box<dyn Error + Send + Sync>> {
         let table = from_toml_table(uri, toml::from_str(text)?);
         Ok(table)
     }
@@ -179,11 +179,13 @@ fn is_string_array(array: &[toml::Value]) -> bool {
 mod tests {
     use {
         super::*,
+        crate::Result,
+        color_eyre::eyre,
         config::{Config, File},
     };
 
     #[test_log::test]
-    fn test_string_array_becomes_map() -> eyre::Result<()> {
+    fn test_string_array_becomes_map() -> Result<()> {
         let toml = r#"
             allowedTools = ["read", "write", "execute"]
         "#;
@@ -201,7 +203,7 @@ mod tests {
     }
 
     #[test_log::test]
-    fn test_merging_behavior() -> eyre::Result<()> {
+    fn test_merging_behavior() -> Result<()> {
         let base_toml = r#"
             allowedTools = ["read", "write"]
         "#;
@@ -229,7 +231,7 @@ mod tests {
     }
 
     #[test_log::test]
-    fn test_non_string_arrays_unchanged() -> eyre::Result<()> {
+    fn test_non_string_arrays_unchanged() -> Result<()> {
         let toml = r#"
             numbers = [1, 2, 3]
             mixed = [[1, 2], [3, 4]]
@@ -251,7 +253,7 @@ mod tests {
     }
 
     #[test_log::test]
-    fn test_merged_set_deserialization() -> eyre::Result<()> {
+    fn test_merged_set_deserialization() -> Result<()> {
         use serde::Deserialize;
 
         #[derive(Deserialize)]
@@ -284,7 +286,7 @@ mod tests {
     }
 
     #[test_log::test]
-    fn test_merged_set_serialization() -> eyre::Result<()> {
+    fn test_merged_set_serialization() -> Result<()> {
         let mut set = HashSet::new();
         set.insert("read".to_string());
         set.insert("write".to_string());
@@ -304,7 +306,7 @@ mod tests {
     }
 
     #[test_log::test]
-    fn test_empty_merged_set_inheritance() -> eyre::Result<()> {
+    fn test_empty_merged_set_inheritance() -> Result<()> {
         use serde::{Deserialize, Serialize};
 
         #[derive(Serialize, Deserialize)]

@@ -14,12 +14,12 @@ use {
         merging_format::MergedSet,
         os::Fs,
     },
-    eyre::eyre,
+    color_eyre::eyre::eyre,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
     std::{
         collections::HashMap,
         fmt::{Debug, Display},
-        path::PathBuf,
+        path::{Path, PathBuf},
     },
     tracing::debug,
 };
@@ -142,8 +142,8 @@ impl QgAgent {
         };
     }
 
-    pub async fn write(&self, fs: &Fs, destination: PathBuf) -> crate::Result<()> {
-        let destination = destination.join(format!("{}.json", &self.name));
+    pub async fn write(&self, fs: &Fs, destination: impl AsRef<Path>) -> crate::Result<()> {
+        let destination = destination.as_ref().join(format!("{}.json", &self.name));
         tracing::info!(
             "writing agent config [{self}] {}",
             destination.as_os_str().display()
