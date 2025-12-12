@@ -29,12 +29,13 @@ pub struct AgentResult {
     pub agent: QgAgent,
     pub writable: bool,
     pub destination: PathBuf,
+    pub local: bool,
 }
 
 impl From<AgentResult> for Row {
     fn from(agent_result: AgentResult) -> Row {
         let mut row = Row::new();
-        let dest = if agent_result.agent.skeleton {
+        let dest = if agent_result.agent.skeleton() {
             Cell::new("💀")
         } else if agent_result.destination.is_absolute() {
             Cell::new("$HOME/.kiro/agents")
@@ -75,15 +76,28 @@ impl Debug for Generator {
         )
     }
 }
+fn default_path(fs: &Fs, config_path: Option<PathBuf>) -> PathBuf {
+    match (fs.is_chroot(), config_path) {
+        (true, None) => PathBuf::from("dev").join("null"),
+        (false, None) => PathBuf::default(),
+        (_, Some(path)) => path,
+    }
+}
 
 impl Generator {
     pub fn local(fs: Fs) -> Result<Self> {
-        Self::new(fs, true, None)
+        Self::new(fs, None)
     }
 
     /// Read kg.toml file and collect all agents
-    pub fn new(fs: Fs, local_mode: bool, config_path: Option<PathBuf>) -> Result<Self> {
-        let global_path = config_path.unwrap_or_default();
+    pub fn new(fs: Fs, config_path: Option<PathBuf>) -> Result<Self> {
+        let local_mode = config_path.is_none();
+        let global_path = if local_mode {
+            default_path(&fs, None)
+        } else {
+            default_path(&fs, config_path)
+        };
+
         let (agents, local_agents) = Self::discover(&fs, &global_path, local_mode)?;
         Ok(Self {
             global_path,
@@ -110,26 +124,27 @@ impl Generator {
         local_mode: bool,
     ) -> Result<(HashMap<String, QgAgent>, HashSet<String>)> {
         let mut local_path: PathBuf = PathBuf::from(".kiro").join("generators").join("kg.toml");
-        if fs.is_same(global_path, &local_path) {
-            tracing::debug!("global and local are the same");
+        // if global and local are the same, then i ASSUME i am in home dir
+        let in_home_dir = fs.is_same(global_path, &local_path);
+        if in_home_dir {
+            tracing::debug!("appear to be in home dir");
             local_path = PathBuf::default();
         }
         let local_exists = fs.exists(&local_path);
+        let global_exists = fs.exists(global_path);
 
         tracing::record_all!(
             tracing::Span::current(),
             local = local_exists,
-            global = fs.exists(global_path)
+            global = global_exists
         );
-        if !local_exists && !fs.exists(global_path) {
+        if !local_exists && !global_exists {
             return Err(eyre!(
                 "no kg.toml configuration found in local or global locations local={} global={}",
                 local_path.display(),
                 global_path.display()
             ));
         }
-        // See Self::new
-
         let builder = Config::builder().add_source(
             config::File::from(global_path.clone())
                 .required(false)
@@ -174,7 +189,7 @@ impl Generator {
         let mut resolved_agents: HashMap<String, QgAgent> =
             HashMap::with_capacity(all_agents_names.len());
 
-        let global_dir = if fs.exists(global_path) {
+        let global_dir = if global_exists {
             match global_path.parent() {
                 Some(parent) => parent.to_path_buf(),
                 None => {
@@ -192,24 +207,24 @@ impl Generator {
             let _enter = span.enter();
             let mut builder = Config::builder();
 
-            // ~/.kiro/generators/<agent-name>.toml
+            if !local_mode {
+                // ~/.kiro/generators/<agent-name>.toml
+                let location = global_dir.join(format!("{name}.toml"));
+                let content = fs.read_to_string_sync(&location).ok().unwrap_or_default();
+                if !content.is_empty() {
+                    builder =
+                        builder.add_source(config::File::from_str(&content, MergingTomlFormat));
+                    tracing::debug!("adding {}", location.as_os_str().display());
+                }
 
-            let location = global_dir.join(format!("{name}.toml"));
-            let content = fs.read_to_string_sync(&location).ok().unwrap_or_default();
-            if !content.is_empty() || !local_mode {
-                builder = builder.add_source(config::File::from_str(&content, MergingTomlFormat));
-                tracing::debug!("adding {}", location.as_os_str().display());
-            }
-
-            // ~/.kiro/generators/kg.toml
-            if let Some(a) = global_agents.agents.get(&name)
-                && !local_mode
-            {
-                tracing::debug!("adding ~/.kiro/generators/kg.toml");
-                builder = builder.add_source(config::File::from_str(
-                    &toml::to_string(a)?,
-                    MergingTomlFormat,
-                ));
+                // ~/.kiro/generators/kg.toml
+                if let Some(a) = global_agents.agents.get(&name) {
+                    tracing::debug!("adding ~/.kiro/generators/kg.toml");
+                    builder = builder.add_source(config::File::from_str(
+                        &toml::to_string(a)?,
+                        MergingTomlFormat,
+                    ));
+                }
             }
 
             // local .kiro/generators/<agent-name>.toml
@@ -217,7 +232,8 @@ impl Generator {
                 .join("generators")
                 .join(format!("{name}.toml"));
             let content = fs.read_to_string_sync(&location).ok().unwrap_or_default();
-            if !content.is_empty() {
+            // if in home dir, don't add to local agents
+            if !content.is_empty() && !in_home_dir {
                 builder = builder.add_source(config::File::from_str(&content, MergingTomlFormat));
                 tracing::debug!("adding {}", location.as_os_str().display());
                 local_agents.insert(name.clone());
@@ -301,7 +317,6 @@ impl Generator {
                 }
                 agent = self.merge_agents(self.agents.get(parent).unwrap(), agent)?;
             }
-
             agent.name = name.clone();
             resolved_agents.insert(name.clone(), agent);
         }
@@ -351,7 +366,7 @@ impl Generator {
     }
 
     pub async fn write_all(&self, dry_run: bool) -> Result<Vec<AgentResult>> {
-        let has_local = !self.agents.is_empty();
+        let has_local = !self.local_agents.is_empty();
         if dry_run {
             tracing::info!("Validating config {has_local}");
         } else {
@@ -375,16 +390,14 @@ impl Generator {
     ) -> Result<AgentResult> {
         let destination = self.destination_dir(&agent.name);
         let mut result = AgentResult {
+            writable: !agent.skeleton(),
+            local: self.local_agents.contains(&agent.name),
             destination,
             agent,
-            writable: true,
         };
         if has_local {
-            result.writable = !result.destination.is_absolute();
-        } else {
-            result.writable = !result.agent.skeleton;
+            result.writable = !result.agent.skeleton() && !result.destination.is_absolute();
         }
-
         if dry_run {
             return Ok(result);
         }
@@ -432,22 +445,30 @@ mod tests {
     async fn _discover_agents(fs: Fs) -> Result<()> {
         //        let global =
         // PathBuf::from(".kiro").join("generators").join("kg.toml");
-        let generator = Generator::new(fs.clone(), false, None)?;
+        let generator = Generator::new(fs.clone(), None)?;
         assert!(!generator.agents.is_empty());
         assert_eq!(4, generator.agents.len());
         assert_eq!(4, generator.local_agents.len());
         // Check that base agent exists and is a skeleton
+        assert!(generator.agents.contains_key("base"));
         if let Some(base) = generator.agents.get("base") {
-            assert!(base.skeleton);
+            assert!(base.skeleton());
         }
-        let agents = generator.write_all(false, true).await?;
+        tracing::debug!(
+            "Loaded Agent Generator Config:\n{}",
+            serde_json::to_string_pretty(&generator)?
+        );
+        let results = generator.write_all(false).await?;
 
-        for agent in &agents {
+        for r in &results {
+            let agent = &r.agent;
             let destination = PathBuf::from(".kiro")
                 .join("agents")
                 .join(format!("{}.json", agent.name));
             tracing::info!("checking output at {}", destination.as_os_str().display());
-            if agent.skeleton {
+            //            tracing::info!("{}",
+            // serde_json::to_string_pretty(agent).unwrap());
+            if agent.skeleton() {
                 assert!(!fs.exists(&destination));
             } else {
                 assert!(fs.exists(&destination));

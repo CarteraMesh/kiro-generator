@@ -19,7 +19,7 @@ use {
     std::{
         collections::HashMap,
         fmt::{Debug, Display},
-        path::{Path, PathBuf},
+        path::Path,
     },
     tracing::debug,
 };
@@ -36,7 +36,7 @@ pub struct QgAgent {
     /// The intention for this field is to provide high level context to the
     /// agent. This should be seen as the same category of context as a system
     /// prompt.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
     /// Configuration for Model Context Protocol (MCP) servers
     #[serde(default)]
@@ -115,6 +115,10 @@ impl Display for QgAgent {
 }
 
 impl QgAgent {
+    pub fn skeleton(&self) -> bool {
+        self.skeleton
+    }
+
     pub fn get_tool<T: DeserializeOwned + Default>(&self, tool: ToolTarget) -> T {
         match self.tools_settings.get(&tool) {
             Some(value) => match serde_json::from_value(value.clone()) {

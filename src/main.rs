@@ -5,9 +5,11 @@ pub(crate) mod merging_format;
 mod os;
 mod schema;
 use {
-    crate::{generator::Generator, os::Fs},
+    crate::{
+        generator::{AgentResult, Generator},
+        os::Fs,
+    },
     clap::Parser,
-    std::path::PathBuf,
     super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
     tracing::debug,
     tracing_error::ErrorLayer,
@@ -84,7 +86,6 @@ async fn main() -> Result<()> {
     }
 
     let fs = Fs::new();
-    let local_config = PathBuf::from(".kiro").join("generators").join("kg.toml");
     // let global_config: Option<PathBuf> = if global_mode {
     //     Some(home_config)
     // } else if fs.exists(&local_config) {
@@ -93,7 +94,7 @@ async fn main() -> Result<()> {
     let q_generator_config: Generator = if local_mode {
         Generator::local(fs)?
     } else {
-        Generator::new(fs, false, Some(home_config))?
+        Generator::new(fs, Some(home_config))?
     };
     debug!(
         "Loaded Agent Generator Config:\n{}",
@@ -103,13 +104,21 @@ async fn main() -> Result<()> {
     match cmd {
         commands::Command::Validate(_args) | commands::Command::Generate(_args) => {
             let results = q_generator_config.write_all(dry_run).await?;
+            let writable: Vec<AgentResult> = if results.iter().any(|a| a.local) {
+                results.into_iter().filter(|a| a.local).collect()
+            } else {
+                results
+                    .into_iter()
+                    .filter(|a| a.writable || a.agent.skeleton())
+                    .collect()
+            };
             let mut table = Table::new();
             table
                 .load_preset(UTF8_FULL)
                 .apply_modifier(UTF8_ROUND_CORNERS)
                 .set_content_arrangement(ContentArrangement::Dynamic)
-//                .set_width(40)
-                .set_header(vec!["Agent", "Location"]).add_rows(results.into_iter().filter(|a| a.writable));
+                .set_header(vec!["Agent", "Location"])
+                .add_rows(writable);
             print!("{table}");
         }
         _ => {}

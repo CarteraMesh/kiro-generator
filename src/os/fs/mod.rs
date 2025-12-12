@@ -238,7 +238,28 @@ impl Fs {
         }
     }
 
+    #[cfg(target_os = "macos")]
+    pub fn is_same(&self, a: impl AsRef<Path>, b: impl AsRef<Path>) -> bool {
+        use std::os::macos::fs::MetadataExt;
+
+        match (self.stat(a), self.stat(b)) {
+            (Some(a_stat), Some(b_stat)) => a_stat.st_ino() == b_stat.st_ino(),
+            _ => false,
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn is_same(&self, a: impl AsRef<Path>, b: impl AsRef<Path>) -> bool {
+        use std::os::linux::fs::MetadataExt;
+
+        match (self.stat(a), self.stat(b)) {
+            (Some(a_stat), Some(b_stat)) => a_stat.st_ino() == b_stat.st_ino(),
+            _ => false,
+        }
+    }
+
     /// Poor Man's check if two paths are the same
+    #[cfg(target_os = "windows")]
     pub fn is_same(&self, a: impl AsRef<Path>, b: impl AsRef<Path>) -> bool {
         match (self.stat(a), self.stat(b)) {
             (Some(a_stat), Some(b_stat)) => {
