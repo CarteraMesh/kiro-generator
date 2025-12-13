@@ -132,14 +132,14 @@ impl ToolMerge<MergingExecuteShellTool> for MergingExecuteShellTool {
         // MergedSet already handles merging via MergingTomlFormat
         // Just handle force_allowed_commands override
         if !self.force_allowed_commands.is_empty() {
-            tracing::debug!(
+            tracing::trace!(
                 "Applying execute_shell.forceAllowedCommands: {:?}",
                 self.force_allowed_commands.iter().collect::<Vec<_>>()
             );
             for cmd in self.force_allowed_commands.iter() {
                 self.allowed_commands.insert(cmd.clone());
                 if !self.denied_commands.remove(cmd) {
-                    tracing::debug!("Removed command from denied_commands: {}", cmd);
+                    tracing::trace!("Removed command from denied_commands: {}", cmd);
                 }
             }
         }
@@ -186,7 +186,7 @@ impl ToolMerge<MergingReadTool> for MergingReadTool {
         // MergedSet already handles merging via MergingTomlFormat
         // Just handle force_allowed_paths override
         if !self.force_allowed_paths.is_empty() {
-            tracing::debug!(
+            tracing::trace!(
                 "Applying fs_read.forceAllowedPaths: {:?}",
                 self.force_allowed_paths.iter().collect::<Vec<_>>()
             );
@@ -234,7 +234,7 @@ impl ToolMerge<MergingWriteTool> for MergingWriteTool {
         // MergedSet already handles merging via MergingTomlFormat
         // Just handle force_allowed_paths override
         if !self.force_allowed_paths.is_empty() {
-            tracing::debug!(
+            tracing::trace!(
                 "Applying fs_write.forceAllowedPaths: {:?}",
                 self.force_allowed_paths.iter().collect::<Vec<_>>()
             );

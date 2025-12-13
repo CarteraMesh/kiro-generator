@@ -5,13 +5,10 @@ pub(crate) mod merging_format;
 mod os;
 mod schema;
 use {
-    crate::{
-        generator::{AgentResult, Generator},
-        os::Fs,
-    },
+    crate::{generator::Generator, os::Fs},
     clap::Parser,
     super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
-    tracing::debug,
+    tracing::{debug, enabled},
     tracing_error::ErrorLayer,
     tracing_subscriber::prelude::*,
 };
@@ -54,8 +51,7 @@ fn init_tracing(debug: bool) {
 async fn main() -> Result<()> {
     color_eyre::install()?;
     let cli = commands::Cli::parse();
-    let cmd = cli.command();
-    if matches!(cmd, commands::Command::Version) {
+    if matches!(cli.command, commands::Command::Version) {
         println!("{}", clap::crate_version!());
         return Ok(());
     }
@@ -67,8 +63,8 @@ async fn main() -> Result<()> {
     );
     let _guard = span.enter();
 
-    let local_mode = cli.is_local(&cmd);
-    let global_mode = cli.is_global(&cmd);
+    let local_mode = cli.is_local();
+    let global_mode = cli.is_global();
     let (home_dir, home_config) = cli.config()?;
     if global_mode {
         debug!(
@@ -80,49 +76,47 @@ async fn main() -> Result<()> {
     if local_mode {
         span.record("local_mode", true);
     }
-    let dry_run = cli.dry_run(&cmd);
+    let dry_run = cli.dry_run();
     if dry_run {
         span.record("dry_run", true);
     }
 
     let fs = Fs::new();
-    // let global_config: Option<PathBuf> = if global_mode {
-    //     Some(home_config)
-    // } else if fs.exists(&local_config) {
-    //     None
-    // }
-    let q_generator_config: Generator = if local_mode {
-        Generator::local(fs)?
+    let location = if local_mode {
+        generator::ConfigLocation::Local
+    } else if global_mode {
+        generator::ConfigLocation::Global(home_config)
     } else {
-        Generator::new(fs, Some(home_config))?
+        // Default: merge both global and local
+        generator::ConfigLocation::Both(home_config)
     };
-    debug!(
-        "Loaded Agent Generator Config:\n{}",
-        serde_json::to_string_pretty(&q_generator_config)?
-    );
 
-    match cmd {
+    let q_generator_config: Generator = Generator::new(fs, location)?;
+    if enabled!(tracing::Level::TRACE) {
+        tracing::trace!(
+            "Loaded Agent Generator Config:\n{}",
+            serde_json::to_string_pretty(&q_generator_config)?
+        );
+    }
+
+    match cli.command {
         commands::Command::Validate(_args) | commands::Command::Generate(_args) => {
             let results = q_generator_config.write_all(dry_run).await?;
-            let writable: Vec<AgentResult> = if results.iter().any(|a| a.local) {
-                results.into_iter().filter(|a| a.local).collect()
-            } else {
-                results
-                    .into_iter()
-                    .filter(|a| a.writable || a.agent.skeleton())
-                    .collect()
-            };
             let mut table = Table::new();
             table
                 .load_preset(UTF8_FULL)
                 .apply_modifier(UTF8_ROUND_CORNERS)
                 .set_content_arrangement(ContentArrangement::Dynamic)
                 .set_header(vec!["Agent", "Location"])
-                .add_rows(writable);
-            print!("{table}");
+                .add_rows(results);
+            println!("{table}");
         }
         _ => {}
     };
-
+    if dry_run {
+        tracing::info!("Validated config");
+    } else {
+        tracing::info!("Overwrote existing config");
+    }
     Ok(())
 }

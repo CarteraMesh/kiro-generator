@@ -1,37 +1,44 @@
 use {
-    clap::{Parser, Subcommand},
+    clap::{
+        Parser,
+        Subcommand,
+        builder::{Styles, styling::AnsiColor},
+    },
     color_eyre::eyre::eyre,
     std::path::PathBuf,
 };
 
+/// Get the color styles for the CLI help menu.
+fn __cli_styles() -> Styles {
+    Styles::styled()
+        .header(AnsiColor::Yellow.on_default())
+        .usage(AnsiColor::Yellow.on_default())
+        .literal(AnsiColor::Green.on_default())
+        .placeholder(AnsiColor::Green.on_default())
+}
+
 #[derive(Parser)]
-#[command(name = "kg", long_version = clap::crate_version!(), about, long_about = "")]
+#[command(name = "kg", version, about, long_about = "", styles=__cli_styles())]
 pub struct Cli {
     #[arg(long, global = true, short = 'v', short_alias = 'd', aliases = ["verbose", "debug"], default_value = "false")]
     pub debug: bool,
     #[command(subcommand)]
-    pub command: Option<Command>,
+    pub command: Command,
 }
 
 #[derive(clap::Args, Clone, Default)]
 pub struct Args {
-    #[arg(
-        long,
-        conflicts_with = "global",
-        help = "Ignore global $HOME directory, use only what's in  .kiro/generators/kg.toml"
-    )]
+    #[arg(long, conflicts_with = "global")]
+    /// Ignore global $HOME kg.toml and all global agent definitions
     pub local: bool,
-    #[arg(
-        short = 'g',
-        long,
-        conflicts_with = "local",
-        help = "Ignore local .kiro/generators/kg.toml config"
-    )]
+    #[arg(short = 'g', long, conflicts_with = "local")]
+    /// Ignore local .kiro/generators/kg.toml config agent definitions
     pub global: bool,
 }
 
 #[derive(Subcommand, Clone)]
 pub enum Command {
+    /// Validate the agent configuration files but do not generate kiro agents
     #[command(alias = "v")]
     Validate(Args),
     #[command(alias = "g")]
@@ -48,27 +55,20 @@ impl Default for Command {
 }
 
 impl Cli {
-    pub fn command(&self) -> Command {
+    pub fn dry_run(&self) -> bool {
+        matches!(self.command, Command::Validate(_))
+    }
+
+    pub fn is_local(&self) -> bool {
         match &self.command {
-            Some(command) => command.clone(),
-            None => Default::default(),
-        }
-    }
-
-    pub fn dry_run(&self, command: &Command) -> bool {
-        matches!(command, Command::Validate(_))
-    }
-
-    pub fn is_local(&self, command: &Command) -> bool {
-        match command {
             Command::Generate(args) => args.local,
             Command::Validate(args) => args.local,
             _ => false,
         }
     }
 
-    pub fn is_global(&self, command: &Command) -> bool {
-        match command {
+    pub fn is_global(&self) -> bool {
+        match &self.command {
             Command::Generate(args) => args.global,
             Command::Validate(args) => args.global,
             _ => false,

@@ -25,7 +25,7 @@ use {
 };
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct QgAgent {
+pub struct KgAgent {
     /// Name of the agent
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
@@ -80,7 +80,7 @@ pub struct QgAgent {
     pub skeleton: bool,
 }
 
-impl Default for QgAgent {
+impl Default for KgAgent {
     fn default() -> Self {
         let default_agent = Agent::default();
         Self {
@@ -102,21 +102,37 @@ impl Default for QgAgent {
     }
 }
 
-impl Debug for QgAgent {
+impl Debug for KgAgent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
-impl Display for QgAgent {
+impl Display for KgAgent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
-impl QgAgent {
+impl KgAgent {
     pub fn skeleton(&self) -> bool {
         self.skeleton
+    }
+
+    pub fn get_tool_aws(&self) -> MergingAwsTool {
+        self.get_tool(ToolTarget::Aws)
+    }
+
+    pub fn get_tool_read(&self) -> MergingReadTool {
+        self.get_tool(ToolTarget::Read)
+    }
+
+    pub fn get_tool_write(&self) -> MergingWriteTool {
+        self.get_tool(ToolTarget::Write)
+    }
+
+    pub fn get_tool_shell(&self) -> MergingExecuteShellTool {
+        self.get_tool(ToolTarget::Shell)
     }
 
     pub fn get_tool<T: DeserializeOwned + Default>(&self, tool: ToolTarget) -> T {
@@ -129,7 +145,7 @@ impl QgAgent {
                 }
             },
             None => {
-                debug!("No tool settings found for {tool}");
+                tracing::trace!("No tool settings found for {tool}");
                 T::default()
             }
         }
@@ -160,14 +176,14 @@ impl QgAgent {
     }
 }
 
-impl From<QgAgent> for Agent {
-    fn from(me: QgAgent) -> Self {
+impl From<KgAgent> for Agent {
+    fn from(me: KgAgent) -> Self {
         Agent::from(&me)
     }
 }
 
-impl From<&QgAgent> for Agent {
-    fn from(me: &QgAgent) -> Self {
+impl From<&KgAgent> for Agent {
+    fn from(me: &KgAgent) -> Self {
         let mut kiro_tool_settings: HashMap<ToolTarget, serde_json::Value> = HashMap::new();
         let tools: Vec<ToolTarget> = enum_iterator::all::<ToolTarget>().collect();
         for tool in tools {

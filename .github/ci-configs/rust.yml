@@ -3,6 +3,9 @@ global:
   packages:
     Linux: ""
 jobs:
+  semver:
+    if: false
+    continue-on-error: false
   extra:
     if: true
     continue-on-error: false

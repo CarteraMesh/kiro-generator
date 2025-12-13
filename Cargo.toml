@@ -12,18 +12,12 @@ keywords = ["kiro", "cli", "agents", "AI"]
 categories = ["command-line-interface", "config"]
 readme = "README.md"
 
-[profile.release]
-strip = false          # Keep symbols for better backtraces
-debug = 1              # Line numbers only (smaller than full debug=2)
-lto = "thin"           # Faster builds than "fat", still good optimization
-codegen-units = 16     # Default, balances compile time vs optimization
-
 [[bin]]
 name = "kg"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4", features = ["cargo", "derive", "env"] }
+clap = { version = "4", features = ["cargo", "derive", "env", "unicode"] }
 color-eyre = { version = "0.6", features = ["issue-url"] }
 config = { version = "0.15" }
 dirs = "6"
@@ -32,7 +26,7 @@ futures = "0.3"
 jsonschema = { version = "0.37", default-features = false, features = ["resolve-async", "resolve-file"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
-super-table = "1.1.1"
+super-table = { version = "1", features = ["custom_styling"] }
 tempfile = "3"
 tokio = { version = "1", features = ["fs", "macros", "rt-multi-thread"] }
 toml = { version = "0.9" }
@@ -42,3 +36,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
+
+[profile.release]
+strip = false          # Keep symbols for better backtraces
+debug = 1              # Line numbers only (smaller than full debug=2)
+lto = "thin"           # Faster builds than "fat", still good optimization
+codegen-units = 16     # Default, balances compile time vs optimization

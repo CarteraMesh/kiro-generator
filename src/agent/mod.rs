@@ -17,7 +17,7 @@ use {
     },
 };
 pub use {
-    kg_agent::QgAgent,
+    kg_agent::KgAgent,
     mcp_config::McpServerConfig,
     tools::*,
     wrapper_types::OriginalToolName,

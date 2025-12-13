@@ -1,6 +1,7 @@
 use {
     std::{
         collections::HashMap,
+        fmt::Debug,
         fs::{Metadata, Permissions},
         io,
         path::{Path, PathBuf},
@@ -92,13 +93,22 @@ fn append(base: impl AsRef<Path>, path: impl AsRef<Path>) -> PathBuf {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Fs {
     Real,
     /// Uses the real filesystem except acts as if the process has
     /// a different root directory by using [TempDir]
     Chroot(Arc<TempDir>),
     Fake(Arc<Mutex<HashMap<PathBuf, Vec<u8>>>>),
+}
+
+impl Debug for Fs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Fs::Chroot(dir) => write!(f, "chroot({})", dir.path().display()),
+            _ => Ok(()), // only Chroot is useful, in testing
+        }
+    }
 }
 
 impl Fs {
