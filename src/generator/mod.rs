@@ -124,9 +124,10 @@ impl Generator {
         local_mode: bool,
     ) -> Result<(HashMap<String, QgAgent>, HashSet<String>)> {
         let mut local_path: PathBuf = PathBuf::from(".kiro").join("generators").join("kg.toml");
-        // if global and local are the same, then i ASSUME i am in home dir
-        let in_home_dir = fs.is_same(global_path, &local_path);
-        if in_home_dir {
+        // if global and local are the same, then don't add to local agents (most likely
+        // you are in home dir)
+        let is_canonical_config = fs.is_same(global_path, &local_path);
+        if is_canonical_config {
             tracing::debug!("appear to be in home dir");
             local_path = PathBuf::default();
         }
@@ -232,8 +233,8 @@ impl Generator {
                 .join("generators")
                 .join(format!("{name}.toml"));
             let content = fs.read_to_string_sync(&location).ok().unwrap_or_default();
-            // if in home dir, don't add to local agents
-            if !content.is_empty() && !in_home_dir {
+            // if global and local are the same, don't add to local agents
+            if !content.is_empty() && !is_canonical_config {
                 builder = builder.add_source(config::File::from_str(&content, MergingTomlFormat));
                 tracing::debug!("adding {}", location.as_os_str().display());
                 local_agents.insert(name.clone());
@@ -247,7 +248,7 @@ impl Generator {
                     MergingTomlFormat,
                 ));
             }
-            let agent: QgAgent = builder
+            let mut agent: QgAgent = builder
                 .build()?
                 .try_deserialize()
                 .context(format!("failed to deserialize {name}"))?;
@@ -257,6 +258,7 @@ impl Generator {
                     serde_json::to_string(&agent).unwrap()
                 );
             }
+            agent.name = name.clone();
             resolved_agents.insert(name, agent);
         }
         Ok((resolved_agents, local_agents))
@@ -373,7 +375,6 @@ impl Generator {
             tracing::info!("Overwriting existing config {has_local}");
         }
         let agents = self.merge()?;
-
         let mut results = Vec::with_capacity(agents.len());
         for agent in agents {
             results.push(self.write(agent, dry_run, has_local).await?);
@@ -381,12 +382,12 @@ impl Generator {
         Ok(results)
     }
 
-    #[tracing::instrument(skip(dry_run, has_local), level = "info")]
+    #[tracing::instrument(skip(dry_run, has_local_agents), level = "info")]
     pub(crate) async fn write(
         &self,
         agent: QgAgent,
         dry_run: bool,
-        has_local: bool,
+        has_local_agents: bool,
     ) -> Result<AgentResult> {
         let destination = self.destination_dir(&agent.name);
         let mut result = AgentResult {
@@ -395,8 +396,9 @@ impl Generator {
             destination,
             agent,
         };
-        if has_local {
-            result.writable = !result.agent.skeleton() && !result.destination.is_absolute();
+        if result.writable && has_local_agents {
+            // only mark relative (local) agent as writable
+            result.writable = !result.destination.is_absolute();
         }
         if dry_run {
             return Ok(result);

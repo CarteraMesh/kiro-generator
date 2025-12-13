@@ -7,7 +7,11 @@
 
 ## About
 
-`kiro-generator` is a tool for managing and generating [Kiro](https://kiro.dev/docs/) agent files.
+`kiro-generator` is a tool for managing and generating [Kiro](https://kiro.dev/docs/) custom agent [files](https://kiro.dev/docs/cli/custom-agents/).
+
+## Quick Start 
+
+1. Define your agents in `~/.kiro/generators/kg.toml`
 
 `cat ~/.kiro/generators/kg.toml`
 
@@ -53,10 +57,6 @@ $ kg generate
 ```
 
 ---
-
-## Why?
-
-Because managing JSON config files are the second worse, obviously YAML files takes 1st prize
 
 ## Features
 
