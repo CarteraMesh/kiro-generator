@@ -36,6 +36,10 @@ pub struct Args {
     /// Ignore local .kiro/generators/kg.toml config agent definitions
     pub global: bool,
 
+    /// Show skeleton agents in output
+    #[arg(long, default_value = "false")]
+    pub show_skeletons: bool,
+
     /// Format of the console output
     #[arg(short = 'f', long,  default_value_t = Format::default())]
     pub format: Format,

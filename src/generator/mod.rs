@@ -5,7 +5,6 @@ use {
         os::Fs,
     },
     color_eyre::eyre::{Context, eyre},
-    colored::Colorize,
     config::Config,
     serde::{Deserialize, Serialize},
     std::{
@@ -13,7 +12,6 @@ use {
         fmt::{self, Debug},
         path::PathBuf,
     },
-    super_table::{Cell, Row},
 };
 mod config_location;
 mod discover;
@@ -27,91 +25,6 @@ pub struct AgentResult {
     pub agent: KgAgent,
     pub writable: bool,
     pub destination: PathBuf,
-}
-
-impl From<AgentResult> for Row {
-    fn from(agent_result: AgentResult) -> Row {
-        let mut row = Row::new();
-        let dest = if agent_result.agent.skeleton() {
-            Cell::new(format!("{} {}", "💀", "skeleton".dimmed()))
-        } else if agent_result.destination.is_absolute() {
-            Cell::new("$HOME/.kiro/agents")
-        } else {
-            Cell::new(".kiro/agents")
-        };
-        row.add_cell(Cell::new(&agent_result.agent.name));
-
-        let sh = agent_result
-            .agent
-            .get_tool_shell()
-            .force_allowed_commands
-            .0
-            .into_iter()
-            .collect::<Vec<String>>();
-        let read = agent_result
-            .agent
-            .get_tool_read()
-            .force_allowed_paths
-            .0
-            .into_iter()
-            .collect::<Vec<String>>();
-        let write = agent_result
-            .agent
-            .get_tool_write()
-            .force_allowed_paths
-            .0
-            .into_iter()
-            .collect::<Vec<String>>();
-        let mut forced = vec![];
-        if !sh.is_empty() {
-            let l = serde_yml::to_string(&sh).unwrap_or_default();
-            forced.push(Cell::new(format!("cmds:\n{l}")));
-        }
-        if !read.is_empty() {
-            let l = serde_yml::to_string(&read).unwrap_or_default();
-            forced.push(Cell::new(format!("read:\n{l}")));
-        }
-        if !write.is_empty() {
-            let l = serde_yml::to_string(&write).unwrap_or_default();
-            forced.push(Cell::new(format!("write:\n{l}")));
-        }
-        row.add_cell(dest);
-        let mut inherits = agent_result
-            .agent
-            .inherits
-            .0
-            .iter()
-            .cloned()
-            .collect::<Vec<String>>();
-        inherits.sort();
-        row.add_cell(Cell::new(inherits.join(",")));
-        let mut servers = Vec::with_capacity(agent_result.agent.mcp_servers.mcp_servers.len());
-        for (k, v) in &agent_result.agent.mcp_servers.mcp_servers {
-            if !v.disabled {
-                servers.push(k.clone());
-            }
-        }
-        row.add_cell(Cell::new(servers.join(",")));
-
-        match forced.len() {
-            0 => {
-                row.add_cell(Cell::new("").set_colspan(3));
-            }
-            1 => {
-                row.add_cell(forced[0].clone().set_colspan(3));
-            }
-            2 => {
-                row.add_cell(forced[0].clone());
-                row.add_cell(forced[1].clone().set_colspan(2));
-            }
-            _ => {
-                for c in forced {
-                    row.add_cell(c);
-                }
-            }
-        };
-        row
-    }
 }
 
 /// Container for all agent declarations from kg.toml files
@@ -226,6 +139,7 @@ impl Generator {
             let out = result
                 .destination
                 .join(format!("{}.json", result.agent.name));
+
             self.fs
                 .write(&out, serde_json::to_string_pretty(&result.kiro_agent)?)
                 .await
@@ -355,26 +269,28 @@ mod tests {
                     .join("dependabot.json"),
             )
             .await?;
-        let kiro_agent: Agent = serde_json::from_str(&content)?;
-        assert_eq!("dependabot", kiro_agent.name);
-        let exec_tool: ExecuteShellTool = kiro_agent.get_tool(ToolTarget::Shell);
+        let dependabot: Agent = serde_json::from_str(&content)?;
+        assert_eq!("dependabot", dependabot.name);
+        assert!(dependabot.mcp_servers.mcp_servers.contains_key("rustdocs"));
+        assert!(dependabot.mcp_servers.mcp_servers.contains_key("cargo"));
+        let exec_tool: ExecuteShellTool = dependabot.get_tool(ToolTarget::Shell);
         tracing::info!("{:?}", exec_tool);
         assert!(exec_tool.allowed_commands.contains("git commit .*"));
         assert!(exec_tool.allowed_commands.contains("git push .*"));
         assert!(!exec_tool.denied_commands.contains("git commit .*"));
         assert!(!exec_tool.denied_commands.contains("git push .*"));
 
-        let fs_tool: WriteTool = kiro_agent.get_tool(ToolTarget::Write);
+        let fs_tool: WriteTool = dependabot.get_tool(ToolTarget::Write);
         tracing::info!("{:?}", fs_tool);
         assert!(fs_tool.allowed_paths.contains(".*Cargo.toml.*"));
         assert!(!fs_tool.denied_paths.contains(".*Cargo.toml.*"));
 
-        tracing::info!("{:?}", kiro_agent.hooks);
-        assert_eq!(2, kiro_agent.hooks.len());
-        assert!(kiro_agent.hooks.contains_key(&HookTrigger::AgentSpawn));
+        tracing::info!("{:?}", dependabot.hooks);
+        assert_eq!(2, dependabot.hooks.len());
+        assert!(dependabot.hooks.contains_key(&HookTrigger::AgentSpawn));
         assert_eq!(
             2,
-            kiro_agent
+            dependabot
                 .hooks
                 .get(&HookTrigger::AgentSpawn)
                 .unwrap()

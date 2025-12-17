@@ -3,12 +3,16 @@ use {
     crate::{
         agent::{
             Agent,
+            AwsTool,
+            ExecuteShellTool,
             MergingAwsTool,
             MergingExecuteShellTool,
             MergingReadTool,
             MergingWriteTool,
             OriginalToolName,
+            ReadTool,
             ToolTarget,
+            WriteTool,
             mcp_config::MergingMcpServerConfig,
         },
         merging_format::MergedSet,
@@ -175,18 +179,22 @@ impl From<&KgAgent> for Agent {
                 let result: Option<serde_json::Value> = match tool {
                     ToolTarget::Aws => {
                         let t: MergingAwsTool = me.get_tool(tool);
+                        let t: AwsTool = t.into();
                         serde_json::to_value(&t).ok()
                     }
                     ToolTarget::Shell => {
                         let t: MergingExecuteShellTool = me.get_tool(tool);
+                        let t: ExecuteShellTool = t.into();
                         serde_json::to_value(&t).ok()
                     }
                     ToolTarget::Read => {
                         let t: MergingReadTool = me.get_tool(tool);
+                        let t: ReadTool = t.into();
                         serde_json::to_value(&t).ok()
                     }
                     ToolTarget::Write => {
                         let t: MergingWriteTool = me.get_tool(tool);
+                        let t: WriteTool = t.into();
                         serde_json::to_value(&t).ok()
                     }
                 };
