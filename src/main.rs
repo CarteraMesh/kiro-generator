@@ -3,11 +3,12 @@ mod commands;
 mod generator;
 pub(crate) mod merging_format;
 mod os;
+pub mod output;
 mod schema;
+mod source;
 use {
     crate::{generator::Generator, os::Fs},
     clap::Parser,
-    super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
     tracing::{debug, enabled},
     tracing_error::ErrorLayer,
     tracing_subscriber::prelude::*,
@@ -100,23 +101,12 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
-        commands::Command::Validate(_args) | commands::Command::Generate(_args) => {
+        commands::Command::Validate(args) | commands::Command::Generate(args) => {
             let results = q_generator_config.write_all(dry_run).await?;
-            let mut table = Table::new();
-            table
-                .load_preset(UTF8_FULL)
-                .apply_modifier(UTF8_ROUND_CORNERS)
-                .set_content_arrangement(ContentArrangement::Dynamic)
-                .set_header(vec!["Agent", "Location"])
-                .add_rows(results);
-            println!("{table}");
+            args.format.result(dry_run, results)?;
         }
         _ => {}
     };
-    if dry_run {
-        tracing::info!("Validated config");
-    } else {
-        tracing::info!("Overwrote existing config");
-    }
+
     Ok(())
 }

@@ -1,28 +1,29 @@
 use {
     crate::{
         Result,
-        agent::{KgAgent, ToolMerge, ToolTarget},
-        merging_format::MergingTomlFormat,
+        agent::{Agent, KgAgent, ToolMerge, ToolTarget},
         os::Fs,
     },
     color_eyre::eyre::{Context, eyre},
-    config::{Config, FileSourceString},
+    colored::Colorize,
+    config::Config,
     serde::{Deserialize, Serialize},
     std::{
         collections::{HashMap, HashSet},
         fmt::{self, Debug},
         path::PathBuf,
     },
-    super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
+    super_table::{Cell, Row},
 };
 mod config_location;
 mod discover;
 mod merge;
-mod source;
 pub use config_location::ConfigLocation;
-use source::*;
+
+use crate::source::*;
 
 pub struct AgentResult {
+    pub kiro_agent: Agent,
     pub agent: KgAgent,
     pub writable: bool,
     pub destination: PathBuf,
@@ -32,14 +33,83 @@ impl From<AgentResult> for Row {
     fn from(agent_result: AgentResult) -> Row {
         let mut row = Row::new();
         let dest = if agent_result.agent.skeleton() {
-            Cell::new(format!("{} skeleton", "💀"))
+            Cell::new(format!("{} {}", "💀", "skeleton".dimmed()))
         } else if agent_result.destination.is_absolute() {
             Cell::new("$HOME/.kiro/agents")
         } else {
             Cell::new(".kiro/agents")
         };
-        row.add_cell(Cell::new(agent_result.agent.name));
+        row.add_cell(Cell::new(&agent_result.agent.name));
+
+        let sh = agent_result
+            .agent
+            .get_tool_shell()
+            .force_allowed_commands
+            .0
+            .into_iter()
+            .collect::<Vec<String>>();
+        let read = agent_result
+            .agent
+            .get_tool_read()
+            .force_allowed_paths
+            .0
+            .into_iter()
+            .collect::<Vec<String>>();
+        let write = agent_result
+            .agent
+            .get_tool_write()
+            .force_allowed_paths
+            .0
+            .into_iter()
+            .collect::<Vec<String>>();
+        let mut forced = vec![];
+        if !sh.is_empty() {
+            let l = serde_yml::to_string(&sh).unwrap_or_default();
+            forced.push(Cell::new(format!("cmds:\n{l}")));
+        }
+        if !read.is_empty() {
+            let l = serde_yml::to_string(&read).unwrap_or_default();
+            forced.push(Cell::new(format!("read:\n{l}")));
+        }
+        if !write.is_empty() {
+            let l = serde_yml::to_string(&write).unwrap_or_default();
+            forced.push(Cell::new(format!("write:\n{l}")));
+        }
         row.add_cell(dest);
+        let mut inherits = agent_result
+            .agent
+            .inherits
+            .0
+            .iter()
+            .cloned()
+            .collect::<Vec<String>>();
+        inherits.sort();
+        row.add_cell(Cell::new(inherits.join(",")));
+        let mut servers = Vec::with_capacity(agent_result.agent.mcp_servers.mcp_servers.len());
+        for (k, v) in &agent_result.agent.mcp_servers.mcp_servers {
+            if !v.disabled {
+                servers.push(k.clone());
+            }
+        }
+        row.add_cell(Cell::new(servers.join(",")));
+
+        match forced.len() {
+            0 => {
+                row.add_cell(Cell::new("").set_colspan(3));
+            }
+            1 => {
+                row.add_cell(forced[0].clone().set_colspan(3));
+            }
+            2 => {
+                row.add_cell(forced[0].clone());
+                row.add_cell(forced[1].clone().set_colspan(2));
+            }
+            _ => {
+                for c in forced {
+                    row.add_cell(c);
+                }
+            }
+        };
         row
     }
 }
@@ -67,6 +137,8 @@ pub struct Generator {
     local_agents: HashSet<String>, // Agents defined in local kg.toml
     #[serde(skip)]
     fs: Fs,
+    #[serde(skip)]
+    format: crate::output::Format,
 }
 
 impl Debug for Generator {
@@ -85,12 +157,14 @@ impl Generator {
     /// Create a new Generator with explicit configuration location
     pub fn new(fs: Fs, location: ConfigLocation) -> Result<Self> {
         let global_path = location.global();
-        let (agents, local_agents) = discover::agents(&fs, &location)?;
+        let format = crate::output::Format::default();
+        let (agents, local_agents) = discover::agents(&fs, &location, &format)?;
         Ok(Self {
             global_path,
             agents,
             local_agents,
             fs,
+            format,
         })
     }
 
@@ -113,9 +187,11 @@ impl Generator {
     pub async fn write_all(&self, dry_run: bool) -> Result<Vec<AgentResult>> {
         let agents = self.merge()?;
         let mut results = Vec::with_capacity(agents.len());
-        let only_global = self.local_agents.is_empty();
+        // If no local agents defined, write all (global) agents
+        // If local agents exist, only write those
+        let write_all_agents = self.local_agents.is_empty();
         for agent in agents {
-            if only_global || self.is_local(&agent.name) {
+            if write_all_agents || self.is_local(&agent.name) {
                 results.push(self.write(agent, dry_run).await?);
             }
         }
@@ -126,18 +202,34 @@ impl Generator {
     pub(crate) async fn write(&self, agent: KgAgent, dry_run: bool) -> Result<AgentResult> {
         let destination = self.destination_dir(&agent.name);
         let result = AgentResult {
+            kiro_agent: Agent::from(&agent),
             writable: !agent.skeleton(),
             destination,
             agent,
         };
+        result.kiro_agent.validate()?;
         if dry_run {
             return Ok(result);
         }
         if !self.fs.exists(&result.destination) {
-            self.fs.create_dir_all(&result.destination).await?;
+            self.fs
+                .create_dir_all(&result.destination)
+                .await
+                .with_context(|| {
+                    format!(
+                        "failed to create directory {}",
+                        result.destination.display()
+                    )
+                })?;
         }
         if result.writable {
-            result.agent.write(&self.fs, &result.destination).await?;
+            let out = result
+                .destination
+                .join(format!("{}.json", result.agent.name));
+            self.fs
+                .write(&out, serde_json::to_string_pretty(&result.kiro_agent)?)
+                .await
+                .with_context(|| format!("failed to write file {}", out.display()))?;
         }
         Ok(result)
     }

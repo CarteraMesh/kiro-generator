@@ -12,14 +12,11 @@ use {
             mcp_config::MergingMcpServerConfig,
         },
         merging_format::MergedSet,
-        os::Fs,
     },
-    color_eyre::eyre::eyre,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
     std::{
         collections::HashMap,
         fmt::{Debug, Display},
-        path::Path,
     },
     tracing::debug,
 };
@@ -66,7 +63,7 @@ pub struct KgAgent {
     /// actual schema differs by tools and is documented in detail in our
     /// documentation
     #[serde(default)]
-    pub tools_settings: HashMap<ToolTarget, serde_json::Value>,
+    pub tools_settings: HashMap<String, serde_json::Value>,
     /// The model ID to use for this agent. If not specified, uses the default
     /// model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -136,7 +133,7 @@ impl KgAgent {
     }
 
     pub fn get_tool<T: DeserializeOwned + Default>(&self, tool: ToolTarget) -> T {
-        match self.tools_settings.get(&tool) {
+        match self.tools_settings.get(tool.as_ref()) {
             Some(value) => match serde_json::from_value(value.clone()) {
                 Ok(settings) => settings,
                 Err(e) => {
@@ -154,25 +151,12 @@ impl KgAgent {
     pub fn set_tool<T: Serialize>(&mut self, tool: ToolTarget, settings: T) {
         match serde_json::to_value(settings) {
             Ok(value) => {
-                self.tools_settings.insert(tool, value);
+                self.tools_settings.insert(tool.to_string(), value);
             }
             Err(e) => {
                 tracing::warn!("Failed to serialize tool settings for agent {self} {tool}: {e}");
             }
         };
-    }
-
-    pub async fn write(&self, fs: &Fs, destination: impl AsRef<Path>) -> crate::Result<()> {
-        let destination = destination.as_ref().join(format!("{}.json", &self.name));
-        tracing::info!(
-            "writing agent config [{self}] {}",
-            destination.as_os_str().display()
-        );
-        let a: Agent = Agent::from(self);
-        a.validate()?;
-        fs.write(destination, serde_json::to_string_pretty(&a)?)
-            .await
-            .map_err(|e| eyre!("failed to write file {e}"))
     }
 }
 
@@ -187,7 +171,7 @@ impl From<&KgAgent> for Agent {
         let mut kiro_tool_settings: HashMap<ToolTarget, serde_json::Value> = HashMap::new();
         let tools: Vec<ToolTarget> = enum_iterator::all::<ToolTarget>().collect();
         for tool in tools {
-            if me.tools_settings.contains_key(&tool) {
+            if me.tools_settings.contains_key(tool.as_ref()) {
                 let result: Option<serde_json::Value> = match tool {
                     ToolTarget::Aws => {
                         let t: MergingAwsTool = me.get_tool(tool);

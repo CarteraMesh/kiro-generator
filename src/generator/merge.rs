@@ -1,7 +1,8 @@
-use super::*;
+use {super::*, tracing::enabled};
 
 impl Generator {
     /// Merge all agents with their inheritance chains
+    #[tracing::instrument(level = "debug")]
     pub fn merge(&self) -> Result<Vec<KgAgent>> {
         let fs = &self.fs;
         let mut resolved_agents: HashMap<String, KgAgent> =
@@ -25,7 +26,7 @@ impl Generator {
         }
 
         for (name, inline_agent) in &self.agents {
-            let span = tracing::debug_span!("merge", parents = ?inline_agent.inherits.0.len(), child = ?name);
+            let span = tracing::debug_span!("agent", name = ?name, parents = ?inline_agent.inherits.0.len());
             let _enter = span.enter();
             let mut builder = Config::builder();
             if !cached_serialized_agents.contains_key(name) {
@@ -59,6 +60,11 @@ impl Generator {
                 agent = self.merge_tools(self.agents.get(parent).unwrap(), agent)?;
             }
             agent.name = name.clone();
+            if enabled!(tracing::Level::TRACE)
+                && let Err(e) = self.format.trace_agent(&agent)
+            {
+                tracing::error!("Failed to trace agent: {e}");
+            }
             resolved_agents.insert(name.clone(), agent);
         }
 
@@ -69,10 +75,8 @@ impl Generator {
     }
 
     /// Merge parent into child (child takes precedence)
+    #[tracing::instrument(level = "debug")]
     fn merge_tools(&self, parent: &KgAgent, mut child: KgAgent) -> Result<KgAgent> {
-        let span = tracing::debug_span!("merge-tools", parent = ?parent, child = ?child);
-        let _enter = span.enter();
-
         let agent_aws = child.get_tool_aws();
         let parent_aws = parent.get_tool_aws();
         let agent_exec = child.get_tool_shell();

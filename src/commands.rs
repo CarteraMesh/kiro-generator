@@ -1,4 +1,5 @@
 use {
+    crate::output::Format,
     clap::{
         Parser,
         Subcommand,
@@ -34,6 +35,15 @@ pub struct Args {
     #[arg(short = 'g', long, conflicts_with = "local")]
     /// Ignore local .kiro/generators/kg.toml config agent definitions
     pub global: bool,
+
+    /// Format of the console output
+    #[arg(short = 'f', long,  default_value_t = Format::default())]
+    pub format: Format,
+
+    /// Enable trace level debug for a agent. Use keyword 'all' to debug all
+    /// agents. Note, this is very verbose
+    #[arg(short = 't', long,  default_value_t = String::default())]
+    pub trace: String,
 }
 
 #[derive(Subcommand, Clone)]
