@@ -23,6 +23,10 @@ fn __cli_styles() -> Styles {
 pub struct Cli {
     #[arg(long, global = true, short = 'v', short_alias = 'd', aliases = ["verbose", "debug"], default_value = "false")]
     pub debug: bool,
+    /// Enable trace level debug for a agent. Use keyword 'all' to debug all
+    /// agents. Note, this is very verbose
+    #[arg(short = 't', long)]
+    pub trace: Option<String>,
     #[command(subcommand)]
     pub command: Command,
 }
@@ -43,11 +47,6 @@ pub struct Args {
     /// Format of the console output
     #[arg(short = 'f', long,  default_value_t = Format::default())]
     pub format: Format,
-
-    /// Enable trace level debug for a agent. Use keyword 'all' to debug all
-    /// agents. Note, this is very verbose
-    #[arg(short = 't', long,  default_value_t = String::default())]
-    pub trace: String,
 }
 
 #[derive(Subcommand, Clone)]

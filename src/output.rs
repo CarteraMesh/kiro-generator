@@ -1,5 +1,11 @@
 use {
-    crate::{Result, agent::KgAgent, generator::AgentResult, os::Fs, source::AgentSource},
+    crate::{
+        Result,
+        agent::{Agent, KgAgent},
+        generator::AgentResult,
+        os::Fs,
+        source::AgentSource,
+    },
     colored::Colorize,
     std::{collections::HashMap, fmt::Display},
     super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
@@ -249,7 +255,8 @@ impl Format {
                 Ok(())
             }
             Format::Json => {
-                // Implement JSON output logic here
+                let kiro_agents: Vec<Agent> = results.into_iter().map(|a| a.kiro_agent).collect();
+                println!("{}", serde_json::to_string_pretty(&kiro_agents)?);
                 Ok(())
             }
         }

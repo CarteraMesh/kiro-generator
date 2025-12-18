@@ -93,6 +93,7 @@ pub(super) fn agents(
     for (name, agent_sources) in sources.iter_mut() {
         let span = tracing::debug_span!("agent", name = ?name);
         let _enter = span.enter();
+        tracing::trace!("matching location");
         match location {
             ConfigLocation::Local => {
                 add_local(

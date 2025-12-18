@@ -17,8 +17,15 @@ pub type Result<T> = color_eyre::Result<T>;
 
 pub const DEFAULT_AGENT_RESOURCES: &[&str] = &["file://AGENTS.md", "file://README.md"];
 
-fn init_tracing(debug: bool) {
-    let filter = if debug {
+fn init_tracing(debug: bool, trace_agent: Option<&str>) {
+    let filter = if let Some(agent) = trace_agent {
+        let directive = if agent == "all" {
+            "trace".to_string()
+        } else {
+            format!("info,[agent{{name=\"{agent}\"}}]=trace")
+        };
+        tracing_subscriber::EnvFilter::new(directive)
+    } else if debug {
         tracing_subscriber::EnvFilter::new("debug")
     } else {
         tracing_subscriber::EnvFilter::try_from_default_env()
@@ -56,7 +63,7 @@ async fn main() -> Result<()> {
         println!("{}", clap::crate_version!());
         return Ok(());
     }
-    init_tracing(cli.debug);
+    init_tracing(cli.debug, cli.trace.as_deref());
     let span = tracing::info_span!(
         "main",
         dry_run = tracing::field::Empty,
