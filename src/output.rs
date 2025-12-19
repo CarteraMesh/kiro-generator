@@ -71,7 +71,7 @@ fn serialize_yaml(label: &str, values: &[String]) -> Option<Cell> {
     if values.is_empty() {
         return None;
     }
-    serde_yml::to_string(values)
+    serde_yaml2::to_string(values)
         .inspect_err(|e| tracing::warn!("Failed to serialize {}: {}", label, e))
         .ok()
         .map(|l| Cell::new(format!("{}{}", label, l)))
