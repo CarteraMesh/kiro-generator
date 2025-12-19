@@ -51,7 +51,7 @@ pub struct Generator {
     #[serde(skip)]
     fs: Fs,
     #[serde(skip)]
-    format: crate::output::Format,
+    format: crate::output::OutputFormat,
 }
 
 impl Debug for Generator {
@@ -68,9 +68,12 @@ impl Debug for Generator {
 
 impl Generator {
     /// Create a new Generator with explicit configuration location
-    pub fn new(fs: Fs, location: ConfigLocation) -> Result<Self> {
+    pub fn new(
+        fs: Fs,
+        location: ConfigLocation,
+        format: crate::output::OutputFormat,
+    ) -> Result<Self> {
         let global_path = location.global();
-        let format = crate::output::Format::default();
         let (agents, local_agents) = discover::agents(&fs, &location, &format)?;
         Ok(Self {
             global_path,
@@ -153,13 +156,9 @@ impl Generator {
 mod tests {
     use {
         super::*,
-        crate::agent::{
-            Agent,
-            AwsTool,
-            ExecuteShellTool,
-            ToolTarget,
-            WriteTool,
-            hook::HookTrigger,
+        crate::{
+            agent::{Agent, AwsTool, ExecuteShellTool, ToolTarget, WriteTool, hook::HookTrigger},
+            output::OutputFormat,
         },
     };
 
@@ -182,7 +181,7 @@ mod tests {
 
     async fn _discover_agents(fs: Fs) -> Result<()> {
         let location = ConfigLocation::Local;
-        let generator = Generator::new(fs.clone(), location)?;
+        let generator = Generator::new(fs.clone(), location, OutputFormat::default())?;
         assert!(!generator.agents.is_empty());
         assert_eq!(4, generator.agents.len());
         assert_eq!(4, generator.local_agents.len());

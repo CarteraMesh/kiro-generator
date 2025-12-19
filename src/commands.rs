@@ -1,12 +1,12 @@
 use {
-    crate::output::Format,
+    crate::output::{ColorOverride, OutputFormat, OutputFormatArg},
     clap::{
         Parser,
         Subcommand,
         builder::{Styles, styling::AnsiColor},
     },
     color_eyre::eyre::eyre,
-    std::path::PathBuf,
+    std::{io::IsTerminal, path::PathBuf},
 };
 
 /// Get the color styles for the CLI help menu.
@@ -25,8 +25,14 @@ pub struct Cli {
     pub debug: bool,
     /// Enable trace level debug for a agent. Use keyword 'all' to debug all
     /// agents. Note, this is very verbose
-    #[arg(short = 't', long)]
+    #[arg(long, short = 't', global = true)]
     pub trace: Option<String>,
+    /// When to show color.
+    #[arg(long = "color", global = true, default_value_t = ColorOverride::default(), value_name = "WHEN")]
+    pub color_override: ColorOverride,
+    /// Format of the console output
+    #[arg(short = 'f', long,  global = true , default_value_t = OutputFormatArg::default())]
+    pub format: OutputFormatArg,
     #[command(subcommand)]
     pub command: Command,
 }
@@ -39,14 +45,9 @@ pub struct Args {
     #[arg(short = 'g', long, conflicts_with = "local")]
     /// Ignore local .kiro/generators/kg.toml config agent definitions
     pub global: bool,
-
     /// Show skeleton agents in output
     #[arg(long, default_value = "false")]
     pub show_skeletons: bool,
-
-    /// Format of the console output
-    #[arg(short = 'f', long,  default_value_t = Format::default())]
-    pub format: Format,
 }
 
 #[derive(Subcommand, Clone)]
@@ -68,6 +69,24 @@ impl Default for Command {
 }
 
 impl Cli {
+    pub fn format_color(&self) -> OutputFormat {
+        match &self.format {
+            OutputFormatArg::Table => OutputFormat::Table(self.color()),
+            OutputFormatArg::Json => OutputFormat::Json,
+        }
+    }
+
+    pub fn color(&self) -> bool {
+        match &self.color_override {
+            ColorOverride::Auto => {
+                std::io::stdout().is_terminal()
+                    && (std::env::var("NO_COLOR").is_err() || std::env::var("CI").is_err())
+            }
+            ColorOverride::Never => false,
+            ColorOverride::Always => true,
+        }
+    }
+
     pub fn dry_run(&self) -> bool {
         matches!(self.command, Command::Validate(_))
     }

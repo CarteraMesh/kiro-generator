@@ -38,6 +38,7 @@ fn init_tracing(debug: bool, trace_agent: Option<&str>) {
             .with(
                 tracing_subscriber::fmt::layer()
                     .with_level(true)
+                    .with_writer(std::io::stderr)
                     .with_target(true),
             )
             .with(ErrorLayer::default())
@@ -49,7 +50,8 @@ fn init_tracing(debug: bool, trace_agent: Option<&str>) {
                 tracing_subscriber::fmt::layer()
                     .without_time()
                     .with_target(false)
-                    .with_level(true),
+                    .with_level(true)
+                    .with_writer(std::io::stderr),
             )
             .with(ErrorLayer::default())
             .init();
@@ -99,7 +101,8 @@ async fn main() -> Result<()> {
         generator::ConfigLocation::Both(home_config)
     };
 
-    let q_generator_config: Generator = Generator::new(fs, location)?;
+    let format = cli.format_color();
+    let q_generator_config: Generator = Generator::new(fs, location, format)?;
     if enabled!(tracing::Level::TRACE) {
         tracing::trace!(
             "Loaded Agent Generator Config:\n{}",
@@ -110,7 +113,7 @@ async fn main() -> Result<()> {
     match cli.command {
         commands::Command::Validate(args) | commands::Command::Generate(args) => {
             let results = q_generator_config.write_all(dry_run).await?;
-            args.format.result(dry_run, args.show_skeletons, results)?;
+            format.result(dry_run, args.show_skeletons, results)?;
         }
         _ => {}
     };

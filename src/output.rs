@@ -10,28 +10,54 @@ use {
     std::{collections::HashMap, fmt::Display},
     super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
 };
+
 /// Override the color setting. Default is [`ColorOverride::Auto`].
-#[derive(Copy, Clone, Debug, clap::ValueEnum)]
+#[derive(Copy, Clone, Debug, Default, clap::ValueEnum)]
 pub enum ColorOverride {
     /// Always display color (i.e. force it).
     Always,
     /// Automatically determine if color should be used or not.
+    #[default]
     Auto,
     /// Never display color.
     Never,
 }
 
+impl Display for ColorOverride {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ColorOverride::Always => "always",
+            ColorOverride::Auto => "auto",
+            ColorOverride::Never => "never",
+        };
+
+        write!(f, "{s}")
+    }
+}
 #[derive(Copy, Clone, Default, Debug, clap::ValueEnum)]
-pub enum Format {
+pub enum OutputFormatArg {
     #[default]
     Table,
     Json,
 }
-impl Display for Format {
+
+#[derive(Copy, Clone, Debug)]
+pub enum OutputFormat {
+    Table(bool),
+    Json,
+}
+
+impl Default for OutputFormat {
+    fn default() -> Self {
+        Self::Table(true)
+    }
+}
+
+impl Display for OutputFormatArg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Format::Table => write!(f, "table"),
-            Format::Json => write!(f, "json"),
+            Self::Table => write!(f, "table"),
+            Self::Json => write!(f, "json"),
         }
     }
 }
@@ -40,17 +66,15 @@ pub(crate) fn agent_header() -> Cell {
     Cell::new(format!("Agent {}", emojis_rs::EMOJI_ROBOT))
 }
 
-impl Format {
+impl OutputFormat {
     pub fn trace_agent(&self, agent: &KgAgent) -> Result<()> {
-        match self {
-            Format::Json | Format::Table => eprintln!("{}", serde_json::to_string_pretty(agent)?),
-        };
+        eprintln!("{}", serde_json::to_string_pretty(agent)?);
         Ok(())
     }
 
     pub fn sources(&self, fs: &Fs, sources: &HashMap<String, Vec<AgentSource>>) -> Result<()> {
         match self {
-            Format::Table => {
+            Self::Table(color) => {
                 let mut table = Table::new();
                 table
                     .load_preset(UTF8_FULL)
@@ -64,13 +88,13 @@ impl Format {
                     ]);
                 for (name, agent_sources) in sources.iter() {
                     let mut row: Vec<Cell> = vec![Cell::new(name.to_string())];
-                    row.extend(agent_sources.iter().map(|s| s.to_cell(fs)));
+                    row.extend(agent_sources.iter().map(|s| s.to_cell(*color, fs)));
                     table.add_row(row);
                 }
                 eprintln!("{table}");
                 Ok(())
             }
-            Format::Json => Ok(()),
+            Self::Json => Ok(()),
         }
     }
 
@@ -192,6 +216,16 @@ impl Format {
         row
     }
 
+    fn maybe_color(&self, mut cell: Cell, c: Color) -> Cell {
+        match self {
+            Self::Table(color) if *color => {
+                cell = cell.fg(c);
+            }
+            _ => {}
+        };
+        cell
+    }
+
     pub fn result(
         &self,
         dry_run: bool,
@@ -199,7 +233,7 @@ impl Format {
         results: Vec<AgentResult>,
     ) -> Result<()> {
         match self {
-            Format::Table => {
+            Self::Table(_) => {
                 let mut table = Table::new();
                 table
                     .load_preset(UTF8_FULL)
@@ -209,18 +243,29 @@ impl Format {
                 // Different header styling for dry-run vs actual generation
                 if dry_run {
                     table.set_header(vec![
-                        Cell::new(format!("Agent {} (PREVIEW)", emojis_rs::EMOJI_ROBOT))
-                            .fg(Color::Yellow),
-                        Cell::new("Loc").fg(Color::Yellow),
-                        Cell::new(format!("MCP {}", emojis_rs::EMOJI_COMPUTER)).fg(Color::Yellow),
-                        Cell::new(format!("Allowed Tools {}", emojis_rs::EMOJI_GEAR))
-                            .fg(Color::Yellow),
-                        Cell::new(format!("Resources {}", emojis_rs::EMOJI_DOCUMENT))
-                            .fg(Color::Yellow),
-                        Cell::new("Forced Permissions")
-                            .set_colspan(3)
-                            .set_alignment(CellAlignment::Center)
-                            .fg(Color::Yellow),
+                        self.maybe_color(
+                            Cell::new(format!("Agent {} (PREVIEW)", emojis_rs::EMOJI_ROBOT)),
+                            Color::Yellow,
+                        ),
+                        self.maybe_color(Cell::new("Loc"), Color::Yellow),
+                        self.maybe_color(
+                            Cell::new(format!("MCP {}", emojis_rs::EMOJI_COMPUTER)),
+                            Color::Yellow,
+                        ),
+                        self.maybe_color(
+                            Cell::new(format!("Allowed Tools {}", emojis_rs::EMOJI_GEAR)),
+                            Color::Yellow,
+                        ),
+                        self.maybe_color(
+                            Cell::new(format!("Resources {}", emojis_rs::EMOJI_DOCUMENT)),
+                            Color::Yellow,
+                        ),
+                        self.maybe_color(
+                            Cell::new("Forced Permissions")
+                                .set_colspan(3)
+                                .set_alignment(CellAlignment::Center),
+                            Color::Yellow,
+                        ),
                     ]);
                 } else {
                     table.set_header(vec![
@@ -254,7 +299,7 @@ impl Format {
                 }
                 Ok(())
             }
-            Format::Json => {
+            Self::Json => {
                 let kiro_agents: Vec<Agent> = results.into_iter().map(|a| a.kiro_agent).collect();
                 println!("{}", serde_json::to_string_pretty(&kiro_agents)?);
                 Ok(())

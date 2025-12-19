@@ -28,7 +28,7 @@ fn add_local(
 pub(super) fn agents(
     fs: &Fs,
     location: &ConfigLocation,
-    format: &crate::output::Format,
+    format: &crate::output::OutputFormat,
 ) -> Result<(HashMap<String, KgAgent>, HashSet<String>)> {
     location.is_valid(fs)?;
 
