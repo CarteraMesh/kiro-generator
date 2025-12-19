@@ -1,7 +1,7 @@
 use {
     crate::{
         Result,
-        agent::{Agent, KgAgent},
+        agent::{Agent, KgAgent, ToolTarget},
         generator::AgentResult,
         os::Fs,
         source::AgentSource,
@@ -9,6 +9,7 @@ use {
     colored::Colorize,
     std::{collections::HashMap, fmt::Display},
     super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
+    tracing::enabled,
 };
 
 /// Override the color setting. Default is [`ColorOverride::Auto`].
@@ -66,6 +67,16 @@ pub(crate) fn agent_header() -> Cell {
     Cell::new(format!("Agent {}", emojis_rs::EMOJI_ROBOT))
 }
 
+fn serialize_yaml(label: &str, values: &[String]) -> Option<Cell> {
+    if values.is_empty() {
+        return None;
+    }
+    serde_yml::to_string(values)
+        .inspect_err(|e| tracing::warn!("Failed to serialize {}: {}", label, e))
+        .ok()
+        .map(|l| Cell::new(format!("{}{}", label, l)))
+}
+
 impl OutputFormat {
     pub fn trace_agent(&self, agent: &KgAgent) -> Result<()> {
         eprintln!("{}", serde_json::to_string_pretty(agent)?);
@@ -73,6 +84,9 @@ impl OutputFormat {
     }
 
     pub fn sources(&self, fs: &Fs, sources: &HashMap<String, Vec<AgentSource>>) -> Result<()> {
+        if !enabled!(tracing::Level::DEBUG) {
+            return Ok(());
+        }
         match self {
             Self::Table(color) => {
                 let mut table = Table::new();
@@ -153,48 +167,26 @@ impl OutputFormat {
         row.add_cell(Cell::new(enabled_tools.join(", ")));
 
         // Forced permissions (security-critical)
-        let sh = result
-            .agent
-            .get_tool_shell()
-            .force_allowed_commands
-            .0
-            .iter()
-            .cloned()
-            .collect::<Vec<String>>();
-        let read = result
-            .agent
-            .get_tool_read()
-            .force_allowed_paths
-            .0
-            .iter()
-            .cloned()
-            .collect::<Vec<String>>();
-        let write = result
-            .agent
-            .get_tool_write()
-            .force_allowed_paths
-            .0
-            .iter()
-            .cloned()
-            .collect::<Vec<String>>();
+        let sh = result.forced(&ToolTarget::Shell);
+        let read = result.forced(&ToolTarget::Read);
+        let write = result.forced(&ToolTarget::Write);
 
         let mut forced = vec![];
-        if !sh.is_empty() {
-            let l = serde_yml::to_string(&sh).unwrap_or_default();
-            forced.push(Cell::new(format!("cmds:\n{l}")));
+        if let Some(c) = serialize_yaml("cmds:\n", &sh) {
+            forced.push(c);
         }
-        if !read.is_empty() {
-            let l = serde_yml::to_string(&read).unwrap_or_default();
-            forced.push(Cell::new(format!("read:\n{l}")));
+        if let Some(c) = serialize_yaml("read:\n", &read) {
+            forced.push(c);
         }
-        if !write.is_empty() {
-            let l = serde_yml::to_string(&write).unwrap_or_default();
-            forced.push(Cell::new(format!("write:\n{l}")));
+        if let Some(c) = serialize_yaml("write:\n", &write) {
+            forced.push(c);
         }
 
         // resources
-        let resources = serde_yml::to_string(&result.agent.resources.0).unwrap_or_default();
-        row.add_cell(Cell::new(resources));
+        if let Some(resources) = serialize_yaml("", &result.resources()) {
+            row.add_cell(resources);
+        }
+
         match forced.len() {
             0 => {
                 row.add_cell(Cell::new("").set_colspan(3));

@@ -21,14 +21,14 @@ fn __cli_styles() -> Styles {
 #[derive(Parser)]
 #[command(name = "kg", version, about, long_about = "", styles=__cli_styles())]
 pub struct Cli {
-    #[arg(long, global = true, short = 'v', short_alias = 'd', aliases = ["verbose", "debug"], default_value = "false")]
+    #[arg(long, global = true, short = 'd' , short_aliases = ['v'], aliases = ["verbose", "debug"], default_value = "false")]
     pub debug: bool,
-    /// Enable trace level debug for a agent. Use keyword 'all' to debug all
+    /// Enable trace level debug for an agent. Use keyword 'all' to debug all
     /// agents. Note, this is very verbose
-    #[arg(long, short = 't', global = true)]
+    #[arg(long, short = 't', global = true, value_name = "AGENT_NAME")]
     pub trace: Option<String>,
     /// When to show color.
-    #[arg(long = "color", global = true, default_value_t = ColorOverride::default(), value_name = "WHEN")]
+    #[arg(long = "color", short = 'c',  global = true, default_value_t = ColorOverride::default(), value_name = "WHEN")]
     pub color_override: ColorOverride,
     /// Format of the console output
     #[arg(short = 'f', long,  global = true , default_value_t = OutputFormatArg::default())]
@@ -55,10 +55,14 @@ pub enum Command {
     /// Validate the agent configuration files but do not generate kiro agents
     #[command(alias = "v")]
     Validate(Args),
+    /// Generate agent configuration JSON files, if local config found only
+    /// local agents are generated. Use --global to generate $HOME agents
     #[command(alias = "g")]
     Generate(Args),
+    /// Not implemented yet
     #[command(alias = "m")]
     Migrate,
+    /// Display version information
     Version,
 }
 

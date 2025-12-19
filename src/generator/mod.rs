@@ -27,6 +27,42 @@ pub struct AgentResult {
     pub destination: PathBuf,
 }
 
+impl AgentResult {
+    pub fn forced(&self, target: &ToolTarget) -> Vec<String> {
+        match target {
+            ToolTarget::Read => self
+                .agent
+                .get_tool_read()
+                .force_allowed_paths
+                .0
+                .iter()
+                .cloned()
+                .collect(),
+            ToolTarget::Write => self
+                .agent
+                .get_tool_write()
+                .force_allowed_paths
+                .0
+                .iter()
+                .cloned()
+                .collect(),
+            ToolTarget::Shell => self
+                .agent
+                .get_tool_shell()
+                .force_allowed_commands
+                .0
+                .iter()
+                .cloned()
+                .collect(),
+            _ => vec![],
+        }
+    }
+
+    pub fn resources(&self) -> Vec<String> {
+        self.agent.resources.0.iter().cloned().collect()
+    }
+}
+
 /// Container for all agent declarations from kg.toml files
 #[derive(Debug, Default, Deserialize)]
 struct KgConfig {

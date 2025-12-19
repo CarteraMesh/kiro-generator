@@ -1,4 +1,4 @@
-use {super::*, tracing::enabled};
+use super::*;
 
 fn add_local(
     fs: &Fs,
@@ -158,9 +158,8 @@ pub(super) fn agents(
         }
         resolved_agents.insert(name.clone(), agent);
     }
-    if enabled!(tracing::Level::DEBUG)
-        && let Err(e) = format.sources(fs, &sources)
-    {
+
+    if let Err(e) = format.sources(fs, &sources) {
         tracing::error!("Failed to format sources: {}", e);
     }
     Ok((resolved_agents, local_agents))
