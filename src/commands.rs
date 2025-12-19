@@ -80,7 +80,8 @@ impl Cli {
         match &self.color_override {
             ColorOverride::Auto => {
                 std::io::stdout().is_terminal()
-                    && (std::env::var("NO_COLOR").is_err() || std::env::var("CI").is_err())
+                    && std::env::var("NO_COLOR").is_err()
+                    && std::env::var("CI").is_err()
             }
             ColorOverride::Never => false,
             ColorOverride::Always => true,

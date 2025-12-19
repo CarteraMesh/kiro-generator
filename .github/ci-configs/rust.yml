@@ -11,6 +11,8 @@ jobs:
     continue-on-error: false
     name: "cli test"
     run: |
+      cargo run -- help
+      cargo run -- --help      
       cargo run -- version
       cargo run -- --version
       cargo run -- validate
