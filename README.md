@@ -21,6 +21,8 @@ default = {  } # default is the agent name
 rust = { inherits = ["default"] }  # rust agent config is merged with default
 ```
 
+2. Define your agent configurations in `~/.kiro/generators/<agent name>.toml`
+
 `cat ~/.kiro/generators/default.toml`
 
 ```toml
@@ -28,7 +30,7 @@ description = "Default agent"
 tools = ["*"]
 allowedTools = ["read", "knowledge", "web_search"]
 resources = ["file://README.md", "file://AGENTS.md"]
-[toolsSettings.execute_bash]
+[toolsSettings.shell]
 allowedCommands = ["git status", "git fetch", "git diff .*" ]
 deniedCommands = ["git commit .*", "git push .*" ]
 autoAllowReadonly = true
@@ -38,36 +40,50 @@ autoAllowReadonly = true
 
 ```toml
 description = "General Rust agent"
-resources = ["file://~/.kiro/resources/rust.md"]
+resources = ["file://RUST.md"]
 allowedTools = [ "@rustdocs", "@cargo" ] # also ["read", "knowledge", "web_search"] from default.toml
 [mcpServers]
-rustdocs = { type = "stdio" , command = "rust-docs-mcp", timeout = 10000 }
-cargo = {  command = "cargo-mcp" , timeout = 120000  }
+rustdocs = { type = "stdio" , command = "rust-docs-mcp", timeout = 1000 }
+cargo = {  command = "cargo-mcp" , timeout = 1200  }
 
 [toolsSettings]
-[toolsSettings.execute_bash]
+[toolsSettings.shell]
 allowedCommands = ["cargo .+" ] ## inherits allowedCommands from default.toml
 deniedCommands = ["cargo publish .*"] ## inherits allowedCommands from default.toml
 ```
 
+3. Validate
 
 ```shell
-$ kg generate 
-## TODO Show command output
-```
+$ kg validate 
+╭────────────────────┬─────┬─────────────────┬────────────────────────────────────────────────┬────────────────────┬────────┬────────┬────────╮
+│ Agent 🤖 (PREVIEW) ┆ Loc ┆ MCP 💻          ┆ Allowed Tools ⚙️                               ┆ Resources 📋       ┆    Forced Permissions    │
+╞════════════════════╪═════╪═════════════════╪════════════════════════════════════════════════╪════════════════════╪══════════════════════════╡
+│ default            ┆ 📁  ┆                 ┆ knowledge, read, web_search                    ┆ - file://README.md ┆                          │
+│                    ┆     ┆                 ┆                                                ┆ - file://AGENTS.md ┆                          │
+│                    ┆     ┆                 ┆                                                ┆                    ┆                          │
+├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ rust               ┆ 📁  ┆ cargo, rustdocs ┆ @cargo, @rustdocs, knowledge, read, web_search ┆ - file://README.md ┆                          │
+│                    ┆     ┆                 ┆                                                ┆ - file://AGENTS.md ┆                          │
+│                    ┆     ┆                 ┆                                                ┆ - file://RUST.md   ┆                          │
+│                    ┆     ┆                 ┆                                                ┆                    ┆                          │
+╰────────────────────┴─────┴─────────────────┴────────────────────────────────────────────────┴────────────────────┴──────────────────────────╯
 
+🎉 Config is valid
+→ Run kg generate to generate agent files
+```
 
 
 ---
 
 ## Installation
 
-### Cargo
+```shell
+cargo install kiro-generator
+```
 
-* Install the rust toolchain in order to have cargo installed by following
-  [this](https://www.rust-lang.org/tools/install) guide.
-* run `cargo install kiro-generator`
 
+---
 
 ## Development
 

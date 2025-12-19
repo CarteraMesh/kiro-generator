@@ -2,6 +2,9 @@ global:
   rustlog: "debug"
   packages:
     Linux: ""
+pages:
+  mdbook:
+    if: true
 jobs:
   semver:
     if: false
@@ -12,7 +15,7 @@ jobs:
     name: "cli test"
     run: |
       cargo run -- help
-      cargo run -- --help      
+      cargo run -- --help
       cargo run -- version
       cargo run -- --version
       cargo run -- validate

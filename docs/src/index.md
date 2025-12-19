@@ -19,11 +19,9 @@ KG provides a hierarchical configuration system that allows you to define and ov
 
 ### Agent Declaration
 
-By default Agents can be declared globally `~/.kiro/generators/kg.toml` or locally `.kiro/generators/kg.toml` . If both are present, the local configuration takes precedence, however both configurations are merged together. You can use `--local` argument to ignore global configuration.
+By default Agents can be declared globally `~/.kiro/generators/kg.toml` or locally `.kiro/generators/kg.toml`. If both are present, the local configuration takes precedence, however both configurations are merged together. You can use `--local` argument to ignore global configuration.
 
-From least precedence to highest precedence (local overrides global): 
 
-`~/.kiro/generators/<agent-name>.toml` ->
-`~/.kiro/generators/kg.toml` ->  
-`.kiro/generators/<agent-name>.toml` ->
-`.kiro/generators/kg.toml`
+### Force Permissions 
+
+You can override toolsettings permissions. For example, you can have your `default` agent deny executing `git push`, but override this for special use cases, see [inheritance](config/inheritance.md) and [usage](./usage.md) for more information.

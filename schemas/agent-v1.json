@@ -43,18 +43,12 @@
     },
     "description": {
       "description": "This field is not model facing and is mostly here for users to discern between agents",
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "default": null
     },
     "prompt": {
       "description": "The intention for this field is to provide high level context to the\nagent. This should be seen as the same category of context as a system prompt.\nSupports both inline text and file:// URIs to reference external files.\nExample: \"file://./my-prompt.md\" (relative to agent config file)",
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "default": null
     },
     "mcpServers": {
@@ -87,26 +81,15 @@
             "items": {
               "type": "string"
             },
-            "default": [
-              "openid",
-              "email",
-              "profile",
-              "offline_access"
-            ]
+            "default": ["openid", "email", "profile", "offline_access"]
           },
           "oauth": {
             "description": "OAuth configuration for this server",
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": ["object", "null"],
             "properties": {
               "redirectUri": {
                 "description": "Custom redirect URI for OAuth flow (e.g., \"127.0.0.1:7778\"). If not specified, a random available port will be assigned by the OS",
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               }
             }
           },
@@ -125,10 +108,7 @@
           },
           "env": {
             "description": "A list of environment variables to run the command with",
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": ["object", "null"],
             "additionalProperties": {
               "type": "string"
             }
@@ -146,9 +126,7 @@
             "default": false
           }
         },
-        "required": [
-          "command"
-        ]
+        "required": ["command"]
       },
       "default": {}
     },
@@ -224,15 +202,10 @@
     },
     "model": {
       "description": "The model ID to use for this agent. If not specified, uses the default model.",
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "default": null
     }
   },
   "additionalProperties": false,
-  "required": [
-    "name"
-  ]
+  "required": ["name"]
 }

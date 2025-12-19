@@ -60,7 +60,7 @@ pub enum Command {
     #[command(alias = "g")]
     Generate(Args),
     /// Not implemented yet
-    #[command(alias = "m")]
+    #[command(alias = "m", hide = true)]
     Migrate,
     /// Display version information
     Version,

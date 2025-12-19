@@ -140,10 +140,11 @@ impl OutputFormat {
                 servers.push(k.clone());
             }
         }
+        servers.sort();
         row.add_cell(Cell::new(servers.join(", ")));
 
         // Allowed tools
-        let allowed_tools: Vec<String> = result
+        let mut allowed_tools: Vec<String> = result
             .agent
             .allowed_tools
             .0
@@ -151,6 +152,7 @@ impl OutputFormat {
             .filter(|t| !t.is_empty())
             .cloned()
             .collect();
+        allowed_tools.sort();
         let mut enabled_tools = Vec::with_capacity(allowed_tools.len());
         for t in allowed_tools {
             if t.len() < 2 {
