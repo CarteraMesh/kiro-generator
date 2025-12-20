@@ -5,6 +5,8 @@ global:
 pages:
   mdbook:
     if: true
+release:
+  cargo-publish: false
 jobs:
   semver:
     if: false

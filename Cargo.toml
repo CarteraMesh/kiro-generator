@@ -2,7 +2,7 @@
 name = "kiro-generator"
 version = "0.1.0"
 edition = "2024"
-description = "Kiro CLI configuration management"
+description = "Kiro Agent CLI configuration management"
 repository = "https://github.com/CarteraMesh/q-generator"
 license = "MIT"
 authors = ["gh@cartera-mesh.com"]
@@ -11,6 +11,15 @@ homepage = "https://github.com/CarteraMesh/q-generator"
 keywords = ["kiro", "cli", "agents", "AI"]
 categories = ["command-line-interface", "config"]
 readme = "README.md"
+
+[package.metadata.deb]
+maintainer = "Dougefresh <dchimento@gmail.com>"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/kg", "usr/bin/", "755"],
+    { source = "README.md", dest = "usr/share/doc/kiro-generator/README", mode = "644"},
+]
 
 [[bin]]
 name = "kg"
