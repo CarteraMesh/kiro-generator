@@ -48,8 +48,8 @@ cargo = {  command = "cargo-mcp" , timeout = 1200  }
 
 [toolsSettings]
 [toolsSettings.shell]
-allowedCommands = ["cargo .+" ] ## inherits allowedCommands from default.toml
-deniedCommands = ["cargo publish .*"] ## inherits allowedCommands from default.toml
+allowedCommands = ["cargo .+" ] # inherits allowedCommands from default.toml
+deniedCommands = ["cargo publish .*"] # inherits deniedCommands from default.toml
 ```
 
 3. Validate

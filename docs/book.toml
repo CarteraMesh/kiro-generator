@@ -10,7 +10,7 @@ create-missing = false
 use-default-preprocessors = true
 
 [output.html]
-default-theme = "Ayu"
+default-theme = "Rust"
 preferred-dark-theme = "Ayu"
 smart-punctuation = true
 mathjax-support = true

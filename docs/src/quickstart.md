@@ -35,8 +35,8 @@
   
   [toolsSettings]
   [toolsSettings.shell]
-  allowedCommands = ["cargo .+" ] ## inherits allowedCommands from default.toml
-  deniedCommands = ["cargo publish .*"] ## inherits allowedCommands from default.toml
+  allowedCommands = ["cargo .+" ] # inherits allowedCommands from default.toml
+  deniedCommands = ["cargo publish .*"] # inherits deniedCommands from default.toml
   ```
 
 3. Validate

@@ -27,13 +27,16 @@
             "type": ["boolean", "null"],
             "default": false
           },
+
           "description": {
             "description": "This field is not model facing and is mostly here for users to discern between agents",
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "default": null
           },
           "prompt": {
             "description": "The intention for this field is to provide high level context to the\nagent. This should be seen as the same category of context as a system prompt.",
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "default": null
           },
           "mcpServers": {
             "description": "Configuration for Model Context Protocol (MCP) servers",
@@ -93,26 +96,27 @@
             "default": {}
           },
           "toolsSettings": {
-            "description": "Settings for specific tools (e.g. aws, shell, read write). These are mostly for native tools. The actual schema differs by\ntools seehttps://kiro.dev/docs/cli/custom-agents/configuration-reference/",
+            "description": "Settings for specific tools. These are mostly for native tools. The actual schema differs by\ntools and is documented in detail in our documentation",
             "type": "object",
             "additionalProperties": {
               "description": "Settings for tools. Refer to our documentations to see how to configure them",
               "type": "object"
             },
             "propertyNames": {
-              "description": "The name of the tool to be configured. ",
+              "description": "The name of the tool to be configured",
               "type": "string"
             },
             "default": {}
           },
-          "includeMcpJson": {
+          "useLegacyMcpJson": {
             "description": "Whether or not to include the legacy global MCP configuration in the agent\nYou can reference tools brought in by these servers as just as you would with the servers\nyou configure in the mcpServers field in this config",
             "type": "boolean",
             "default": false
           },
           "model": {
             "description": "The model ID to use for this agent. If not specified, uses the default model.",
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "default": null
           }
         }
       }
@@ -122,26 +126,27 @@
     "CustomToolConfig": {
       "type": "object",
       "properties": {
+        "type": {
+          "description": "Transport type: \"stdio\", \"http\", or \"registry\"",
+          "type": ["string", "null"]
+        },
         "url": {
           "description": "The URL for HTTP-based MCP server communication",
-          "type": "string",
-          "default": ""
+          "type": "string"
         },
         "headers": {
           "description": "HTTP headers to include when communicating with HTTP-based MCP servers",
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          },
-          "default": {}
+          }
         },
         "oauthScopes": {
           "description": "Scopes with which oauth is done (deprecated: use oauth.oauthScopes instead)",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "default": ["openid", "email", "profile", "offline_access"]
+          }
         },
         "oauth": {
           "description": "OAuth configuration for this server",
@@ -156,16 +161,14 @@
         },
         "command": {
           "description": "The command string used to initialize the mcp server",
-          "type": "string",
-          "default": ""
+          "type": "string"
         },
         "args": {
           "description": "A list of arguments to be used to run the command with",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "default": []
+          }
         },
         "env": {
           "description": "A list of environment variables to run the command with",
@@ -178,21 +181,18 @@
           "description": "Timeout for each mcp request in ms",
           "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "default": 120000
+          "minimum": 0
         },
         "disabled": {
           "description": "A boolean flag to denote whether or not to load this mcp server",
-          "type": "boolean",
-          "default": false
+          "type": "boolean"
         },
         "disabledTools": {
           "description": "List of tool names from this server to disable",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "default": []
+          }
         }
       }
     },
@@ -217,8 +217,68 @@
       "type": "string"
     },
     "ResourcePath": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^(file://)"
+        },
+        {
+          "$ref": "#/$defs/ComplexResource"
+        }
+      ]
+    },
+    "ComplexResource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "pattern": "^(file://)"
+            },
+            "name": {
+              "type": ["string", "null"]
+            },
+            "description": {
+              "type": ["string", "null"]
+            },
+            "indexType": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/IndexType"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "include": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string"
+              }
+            },
+            "exclude": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string"
+              }
+            },
+            "autoUpdate": {
+              "type": ["boolean", "null"]
+            },
+            "type": {
+              "type": "string",
+              "const": "knowledgeBase"
+            }
+          },
+          "required": ["type", "source"]
+        }
+      ]
+    },
+    "IndexType": {
       "type": "string",
-      "pattern": "^(file://)"
+      "enum": ["fast", "best"]
     },
     "Hook": {
       "type": "object",
