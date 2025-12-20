@@ -1,20 +1,25 @@
 # Summary
 
-# Basics
+- [Introduction](index.md)
+- [Installation](install.md)
+- [Quick Start](quickstart.md)
 
-- [Intro](index.md)
-- [Install](install.md)
-- [Usage](usage.md)
+# Configuration
 
-## Examples
+- [Config Files](config/files.md)
+- [Agent Declaration](config/agents.md)
+- [Inheritance](config/inheritance.md)
+- [Skeletons](config/skeletons.md)
 
-- [McpServers](mcp.md)
-- [Hooks](hooks.md)
-- [ToolSettings](toolsettings.md)
-  - [Shell](shell.md)
-  - [AWS](aws.md)
-  - [FS](fs.md)
-- [Permissions](permissions.md)
-- [Skeletons](skeleton.md)
+<!--# Examples
 
-## [Reference](reference.md)
+- [Basic Agent](examples/basic.md)
+- [MCP Servers](examples/mcp.md)
+- [Tool Settings](examples/toolsettings.md)
+- [Hooks](examples/hooks.md)-->
+
+# Reference
+
+- [CLI Commands](reference/cli.md)
+- [Configuration Schema](reference/schema.md)
+- [Troubleshooting](reference/troubleshooting.md)

@@ -1,0 +1,13 @@
+name: mdbook
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    name: verify
+    uses: carteramesh/ci/.github/workflows/pages.yml@main
+    secrets: inherit
+    with:
+      runner: ${{ vars.RUNNER }}

@@ -60,18 +60,18 @@ In this example, the allowedTools field is inherited from the default agent, and
 
 ### Skeletons 
 
-`Skeletons` are like agent templates. `kg` will skip agent `JSON` files. You can use them building blocks or components to derive other real agents.
+`Skeletons` are like agent templates. `kg` will skip generating agent `JSON` files. You can use them building blocks or components to derive other real agents.
 
 `kg.toml`: 
 
 ```toml
 
 [agents.default]
-inherits = []
+inherits = ["git"]
 allowedTools = ["read", "knowledge"]
 
-[agents.git-readonly]
-skeleton = true # do not generate JSON amazon-q agent config
+[agents.git]
+skeleton = true # do not generate JSON agent config
 [toolsSettings.execute_bash]
 allowedCommands = ["git status .*", "git fetch .*", "git diff .*" , "git log .*"]
 
@@ -81,15 +81,11 @@ skeleton = true
 allowedCommands = ["git .*"]
 
 [agents.rust]
-inherits = ["default", "git-readonly"]
+inherits = ["default"]
 allowedTools = [ "@rustdocs", "@cargo" ]
 
 [agents.dependabot]
-inherits = ["default", "git-write", "rust"]
+inherits = ["russt", "git-write"]
 ```
 
-The `dependabot` agent will be able to use any git command. 
-
-## Migrate 
-
-TBD
+The `dependabot` agent will be able to use any git command.
