@@ -1,11 +1,13 @@
 mod agent;
 mod commands;
 mod generator;
+mod kdl;
 pub(crate) mod merging_format;
 mod os;
 pub mod output;
 mod schema;
 mod source;
+
 use {
     crate::{generator::Generator, os::Fs},
     clap::Parser,

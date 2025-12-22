@@ -1,7 +1,7 @@
 use {
     crate::merging_format::MergedSet,
     serde::{Deserialize, Serialize},
-    std::collections::{HashMap, HashSet},
+    std::collections::HashMap,
 };
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -48,7 +48,7 @@ pub struct MergingCustomToolConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env: Option<HashMap<String, String>>,
     /// Timeout for each mcp request in ms
-    #[serde(default = "default_timeout")]
+    #[serde(default = "tool_default_timeout")]
     pub timeout: u64,
     /// A boolean flag to denote whether or not to load this mcp server
     #[serde(default)]
@@ -74,13 +74,13 @@ pub struct CustomToolConfig {
     #[serde(default)]
     pub command: String,
     /// A list of arguments to be used to run the command with
-    #[serde(default, skip_serializing_if = "HashSet::is_empty")]
-    pub args: HashSet<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
     /// A list of environment variables to run the command with
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub env: Option<HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub env: HashMap<String, String>,
     /// Timeout for each mcp request in ms
-    #[serde(default = "default_timeout")]
+    #[serde(default = "tool_default_timeout")]
     pub timeout: u64,
     /// A boolean flag to denote whether or not to load this mcp server
     #[serde(default)]
@@ -95,14 +95,14 @@ impl From<MergingCustomToolConfig> for CustomToolConfig {
             headers: config.headers,
             oauth: config.oauth,
             command: config.command,
-            args: config.args.into(),
-            env: config.env,
+            args: Vec::new(),
+            env: config.env.unwrap_or_default(),
             timeout: config.timeout,
             disabled: config.disabled,
         }
     }
 }
 
-pub fn default_timeout() -> u64 {
+pub fn tool_default_timeout() -> u64 {
     120 * 1000
 }

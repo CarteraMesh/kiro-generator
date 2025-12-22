@@ -219,8 +219,8 @@ mod tests {
         let location = ConfigLocation::Local;
         let generator = Generator::new(fs.clone(), location, OutputFormat::default())?;
         assert!(!generator.agents.is_empty());
-        assert_eq!(4, generator.agents.len());
-        assert_eq!(4, generator.local_agents.len());
+        assert_eq!(3, generator.agents.len());
+        assert_eq!(3, generator.local_agents.len());
         // Check that base agent exists and is a skeleton
         assert!(generator.agents.contains_key("base"));
         if let Some(base) = generator.agents.get("base") {

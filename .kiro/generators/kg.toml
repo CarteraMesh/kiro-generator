@@ -2,7 +2,6 @@
 
 [agents]
 base = { skeleton = true }
-alone = {  }
 dependabot = { inherits = ["aws-test"] }
 
 [agents.aws-test]

@@ -17,6 +17,7 @@ use {
     },
 };
 pub use {
+    custom_tool::{CustomToolConfig, OAuthConfig, TransportType, tool_default_timeout},
     kg_agent::KgAgent,
     mcp_config::McpServerConfig,
     tools::*,
