@@ -13,7 +13,10 @@ use {
         kdl::native::NativeTools,
     },
     knuffel::Decode,
-    std::collections::{HashMap, HashSet},
+    std::{
+        collections::{HashMap, HashSet},
+        hash::Hash,
+    },
 };
 
 #[derive(Decode, Clone, Default, Debug)]
@@ -40,6 +43,19 @@ pub(super) struct Resource {
     pub location: String,
 }
 
+impl PartialEq for Resource {
+    fn eq(&self, other: &Self) -> bool {
+        self.location.eq(&other.location)
+    }
+}
+
+impl Hash for Resource {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.location.hash(state);
+    }
+}
+impl Eq for Resource {}
+
 #[derive(Decode, Clone, Default, Debug)]
 pub(super) struct ToolAliasKdl {
     #[knuffel(argument)]
@@ -58,7 +74,7 @@ pub struct KdlAgent {
     #[knuffel(child, default)]
     pub skeleton: bool,
     #[knuffel(child, default)]
-    inherits: Inherits,
+    pub(super) inherits: Inherits,
     /// The intention for this field is to provide high level context to the
     /// agent. This should be seen as the same category of context as a system
     /// prompt.
@@ -66,24 +82,24 @@ pub struct KdlAgent {
     pub prompt: Option<String>,
     /// Files to include in the agent's context
     #[knuffel(children(name = "resource"))]
-    resources: Vec<Resource>,
+    pub(super) resources: HashSet<Resource>,
     #[knuffel(child, default)]
     pub include_mcp_json: bool,
     /// List of tools the agent can see. Use \"@{MCP_SERVER_NAME}/tool_name\" to
     /// specify tools from mcp servers. To include all tools from a server,
     /// use \"@{MCP_SERVER_NAME}\"
     #[knuffel(child, default)]
-    tools: Tools,
+    pub(super) tools: Tools,
     /// List of tools the agent is explicitly allowed to use
     #[knuffel(child, default)]
-    allowed_tools: AllowedTools,
+    pub(super) allowed_tools: AllowedTools,
     /// The model ID to use for this agent. If not specified, uses the default
     /// model.
     #[knuffel(child, unwrap(argument))]
     pub model: Option<String>,
     /// Commands to run when a chat session is created
     #[knuffel(child)]
-    hook: Option<HookPart>,
+    pub(super) hook: Option<HookPart>,
     #[knuffel(children(name = "mcp"), default)]
     mcp: Vec<CustomToolConfigKdl>,
     #[knuffel(children(name = "alias"), default)]

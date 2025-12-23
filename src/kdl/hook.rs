@@ -8,7 +8,7 @@ macro_rules! define_hook {
         #[derive(Decode, Clone, Debug)]
         pub(super) struct $name {
             /// The command to run when the hook is triggered
-            #[knuffel(child, unwrap(argument))]
+            #[knuffel(child, default, unwrap(argument))]
             pub command: String,
 
             /// Max time the hook can run before it throws a timeout error
@@ -40,6 +40,29 @@ macro_rules! define_hook {
                 }
             }
         }
+
+        impl $name {
+            fn merge(mut self, o: $name) -> $name {
+                if self.cache_ttl_seconds == 0 && o.cache_ttl_seconds > 0 {
+                    self.cache_ttl_seconds = o.cache_ttl_seconds;
+                }
+                if self.command.is_empty() {
+                    self.command = o.command.clone();
+                }
+                if self.max_output_size == 0 && o.max_output_size > 0 {
+                    self.max_output_size = o.max_output_size;
+                }
+                if self.timeout_ms == 0 && o.timeout_ms > 0 {
+                    self.timeout_ms = o.timeout_ms;
+                }
+                if self.matcher.is_none()
+                    && let Some(m) = &o.matcher
+                {
+                    self.matcher = Some(m.clone());
+                }
+                self
+            }
+        }
     };
 }
 
@@ -64,6 +87,59 @@ pub(super) struct HookPart {
 }
 
 impl HookPart {
+    pub fn merge(mut self, other: Self) -> Self {
+        match (&self.agent_spawn, &other.agent_spawn) {
+            (None, None) | (Some(_), None) => {}
+            (None, Some(o)) => self.agent_spawn = Some(o.clone()),
+            (Some(a), Some(o)) => {
+                let merged = a.clone();
+                let other = o.clone();
+                self.agent_spawn = Some(merged.merge(other));
+            }
+        };
+
+        match (&self.user_prompt_submit, &other.user_prompt_submit) {
+            (None, None) | (Some(_), None) => {}
+            (None, Some(o)) => self.user_prompt_submit = Some(o.clone()),
+            (Some(a), Some(o)) => {
+                let merged = a.clone();
+                let other = o.clone();
+                self.user_prompt_submit = Some(merged.merge(other));
+            }
+        };
+
+        match (&self.post_tool_use, &other.post_tool_use) {
+            (None, None) | (Some(_), None) => {}
+            (None, Some(o)) => self.post_tool_use = Some(o.clone()),
+            (Some(a), Some(o)) => {
+                let merged = a.clone();
+                let other = o.clone();
+                self.post_tool_use = Some(merged.merge(other));
+            }
+        };
+
+        match (&self.pre_tool_use, &other.pre_tool_use) {
+            (None, None) | (Some(_), None) => {}
+            (None, Some(o)) => self.pre_tool_use = Some(o.clone()),
+            (Some(a), Some(o)) => {
+                let merged = a.clone();
+                let other = o.clone();
+                self.pre_tool_use = Some(merged.merge(other));
+            }
+        };
+
+        match (&self.stop, &other.stop) {
+            (None, None) | (Some(_), None) => {}
+            (None, Some(o)) => self.stop = Some(o.clone()),
+            (Some(a), Some(o)) => {
+                let merged = a.clone();
+                let other = o.clone();
+                self.stop = Some(merged.merge(other));
+            }
+        };
+        self
+    }
+
     pub fn get(&self, trigger: HookTrigger) -> Option<Hook> {
         match trigger {
             HookTrigger::AgentSpawn => self.agent_spawn.clone().map(Into::into),

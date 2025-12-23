@@ -1,8 +1,8 @@
 mod agent;
 mod hook;
 mod mcp;
+mod merge;
 mod native;
-
 pub use agent::KdlAgent;
 
 #[derive(knuffel::Decode)]
@@ -133,6 +133,29 @@ mod tests {
         assert!(aws_docs.oauth.is_some());
 
         assert_eq!(agent.tool_aliases().len(), 1);
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn test_agent_empty() -> crate::Result<()> {
+        let kdl_agents = r#"
+            agent "test" {
+               skeleton
+            }
+        "#;
+
+        let config: GeneratorConfig = match parse("example.kdl", kdl_agents) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("{:?}", miette::Report::new(e));
+                return Err(eyre!("failed to parse {kdl_agents}"));
+            }
+        };
+        assert_eq!(config.agents.len(), 1);
+        let agent = config.agents[0].clone();
+        assert_eq!(agent.name, "test");
+        assert!(agent.model.is_none());
+        assert!(agent.skeleton);
         Ok(())
     }
 }
