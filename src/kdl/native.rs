@@ -10,15 +10,23 @@ use {
 };
 
 #[derive(Decode, Debug, Clone, Default)]
-pub(super) struct GenericList {
+pub struct GenericList {
     #[knuffel(arguments)]
     pub list: HashSet<String>,
 }
 
 #[derive(Decode, Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) struct Force {
+pub struct Force {
     #[knuffel(argument)]
     pub path: String,
+}
+
+impl From<&str> for Force {
+    fn from(value: &str) -> Self {
+        Self {
+            path: value.to_string(),
+        }
+    }
 }
 
 #[derive(Decode, Clone, Debug, Default)]
@@ -81,7 +89,7 @@ pub struct ExecuteShellTool {
     pub allow: GenericList,
     #[knuffel(child, default)]
     pub deny: GenericList,
-    #[knuffel(property)]
+    #[knuffel(property, default)]
     pub deny_by_default: bool,
     #[knuffel(argument, default)]
     pub disable_auto_readonly: bool,
@@ -103,13 +111,13 @@ impl ExecuteShellTool {
 #[derive(Decode, Default, Clone, Debug)]
 pub struct NativeTools {
     #[knuffel(child, default)]
-    shell: ExecuteShellTool,
+    pub shell: ExecuteShellTool,
     #[knuffel(child, default)]
-    aws: AwsTool,
+    pub aws: AwsTool,
     #[knuffel(child, default)]
-    read: ReadTool,
+    pub read: ReadTool,
     #[knuffel(child, default)]
-    write: WriteTool,
+    pub write: WriteTool,
 }
 
 impl NativeTools {

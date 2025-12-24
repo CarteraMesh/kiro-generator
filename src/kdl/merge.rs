@@ -32,6 +32,7 @@ impl KdlAgent {
         };
 
         self.tool_aliases.extend(other.tool_aliases);
+        self.native = self.native.merge(other.native);
         self
     }
 }
@@ -49,6 +50,14 @@ mod tests {
                inherits "parent"
                include-mcp-json
                tools "@awsdocs" "shell"
+               native {
+                  write {
+                    force  "Cargo.lock"
+                  }
+                  shell {
+                    force  "git push .*"
+                  }
+               }
                hook {
                  agent-spawn {
                      command "echo i have spawned"
@@ -69,6 +78,21 @@ mod tests {
                allowed-tools "write"
                alias "execute_bash" "shell"
                alias "fs_read" "read"
+               native {
+                 read {
+                     allow "./src/*" "./scripts/**"
+                     deny  "Cargo.lock"
+                 }
+                  write {
+                      allow "./src/*" "./scripts/**"
+                      deny  "Cargo.lock"
+                  }
+
+                  shell {
+                      allow "git status .*" "git pull .*"
+                      deny  "git push .*"
+                  }
+               }
                hook {
                    agent-spawn {
                      timeout-ms 1111
@@ -152,6 +176,23 @@ mod tests {
         assert_eq!(alias.len(), 2);
         assert!(alias.contains_key("fs_read"));
         assert!(alias.contains_key("execute_bash"));
+
+        let tool = merged.get_tool_write();
+        assert!(tool.force.contains(&"Cargo.lock".into()));
+        assert_eq!(tool.allow.list.len(), 2);
+        assert_eq!(tool.force.len(), 1);
+        assert_eq!(tool.deny.list.len(), 1);
+
+        let tool = merged.get_tool_read();
+        assert_eq!(tool.allow.list.len(), 2);
+        assert_eq!(tool.force.len(), 0);
+        assert_eq!(tool.deny.list.len(), 1);
+
+        let tool = merged.get_tool_shell();
+        assert_eq!(tool.allow.list.len(), 2);
+        assert_eq!(tool.force.len(), 1);
+        assert_eq!(tool.deny.list.len(), 1);
+
         Ok(())
     }
 }

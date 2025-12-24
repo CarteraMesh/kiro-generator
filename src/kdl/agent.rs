@@ -1,16 +1,8 @@
 use {
     super::{hook::HookPart, mcp::CustomToolConfigKdl},
     crate::{
-        agent::{
-            AwsTool as KiroAwsTool,
-            CustomToolConfig,
-            ExecuteShellTool as KiroShellTool,
-            OriginalToolName,
-            ReadTool as KiroReadTool,
-            WriteTool as KiroWriteTool,
-            hook::HookTrigger,
-        },
-        kdl::native::NativeTools,
+        agent::{CustomToolConfig, OriginalToolName, hook::HookTrigger},
+        kdl::native::{AwsTool, ExecuteShellTool, NativeTools, ReadTool, WriteTool},
     },
     knuffel::Decode,
     std::{
@@ -106,24 +98,24 @@ pub struct KdlAgent {
     pub(super) tool_aliases: HashSet<ToolAliasKdl>,
     /// Tools builtin to kiro
     #[knuffel(child, default)]
-    native: NativeTools,
+    pub(super) native: NativeTools,
 }
 
 impl KdlAgent {
-    pub fn get_tool_aws(&self) -> KiroAwsTool {
-        KiroAwsTool::from(&self.native)
+    pub fn get_tool_aws(&self) -> &AwsTool {
+        &self.native.aws
     }
 
-    pub fn get_tool_read(&self) -> KiroReadTool {
-        KiroReadTool::from(&self.native)
+    pub fn get_tool_read(&self) -> &ReadTool {
+        &self.native.read
     }
 
-    pub fn get_tool_write(&self) -> KiroWriteTool {
-        KiroWriteTool::from(&self.native)
+    pub fn get_tool_write(&self) -> &WriteTool {
+        &self.native.write
     }
 
-    pub fn get_tool_shell(&self) -> KiroShellTool {
-        KiroShellTool::from(&self.native)
+    pub fn get_tool_shell(&self) -> &ExecuteShellTool {
+        &self.native.shell
     }
 
     pub fn tool_aliases(&self) -> HashMap<OriginalToolName, String> {
