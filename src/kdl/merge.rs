@@ -40,6 +40,7 @@ impl KdlAgent {
 #[cfg(test)]
 mod tests {
     use {super::*, crate::agent::hook::HookTrigger, color_eyre::eyre::eyre, knuffel::parse};
+
     #[test_log::test]
     fn test_agent_merge() -> crate::Result<()> {
         let kdl_agents = r#"
