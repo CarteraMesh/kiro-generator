@@ -5,7 +5,7 @@ use {
 
 macro_rules! define_hook {
     ($name:ident) => {
-        #[derive(Decode, Clone, Debug)]
+        #[derive(Decode, Default, Clone, Debug)]
         pub(super) struct $name {
             /// The command to run when the hook is triggered
             #[knuffel(child, default, unwrap(argument))]
@@ -74,79 +74,50 @@ define_hook!(HookStop);
 
 #[derive(Decode, Clone, Default, Debug)]
 pub(super) struct HookPart {
-    #[knuffel(child)]
-    pub agent_spawn: Option<HookAgentSpawn>,
-    #[knuffel(child)]
-    pub user_prompt_submit: Option<HookUserPromptSubmit>,
-    #[knuffel(child)]
-    pub pre_tool_use: Option<HookPreToolUse>,
-    #[knuffel(child)]
-    pub post_tool_use: Option<HookPostToolUse>,
-    #[knuffel(child)]
-    pub stop: Option<HookStop>,
+    #[knuffel(child, default)]
+    pub agent_spawn: HookAgentSpawn,
+    #[knuffel(child, default)]
+    pub user_prompt_submit: HookUserPromptSubmit,
+    #[knuffel(child, default)]
+    pub pre_tool_use: HookPreToolUse,
+    #[knuffel(child, default)]
+    pub post_tool_use: HookPostToolUse,
+    #[knuffel(child, default)]
+    pub stop: HookStop,
 }
 
 impl HookPart {
     pub fn merge(mut self, other: Self) -> Self {
-        match (&self.agent_spawn, &other.agent_spawn) {
-            (None, None) | (Some(_), None) => {}
-            (None, Some(o)) => self.agent_spawn = Some(o.clone()),
-            (Some(a), Some(o)) => {
-                let merged = a.clone();
-                let other = o.clone();
-                self.agent_spawn = Some(merged.merge(other));
-            }
-        };
-
-        match (&self.user_prompt_submit, &other.user_prompt_submit) {
-            (None, None) | (Some(_), None) => {}
-            (None, Some(o)) => self.user_prompt_submit = Some(o.clone()),
-            (Some(a), Some(o)) => {
-                let merged = a.clone();
-                let other = o.clone();
-                self.user_prompt_submit = Some(merged.merge(other));
-            }
-        };
-
-        match (&self.post_tool_use, &other.post_tool_use) {
-            (None, None) | (Some(_), None) => {}
-            (None, Some(o)) => self.post_tool_use = Some(o.clone()),
-            (Some(a), Some(o)) => {
-                let merged = a.clone();
-                let other = o.clone();
-                self.post_tool_use = Some(merged.merge(other));
-            }
-        };
-
-        match (&self.pre_tool_use, &other.pre_tool_use) {
-            (None, None) | (Some(_), None) => {}
-            (None, Some(o)) => self.pre_tool_use = Some(o.clone()),
-            (Some(a), Some(o)) => {
-                let merged = a.clone();
-                let other = o.clone();
-                self.pre_tool_use = Some(merged.merge(other));
-            }
-        };
-
-        match (&self.stop, &other.stop) {
-            (None, None) | (Some(_), None) => {}
-            (None, Some(o)) => self.stop = Some(o.clone()),
-            (Some(a), Some(o)) => {
-                let merged = a.clone();
-                let other = o.clone();
-                self.stop = Some(merged.merge(other));
-            }
-        };
+        self.agent_spawn = self.agent_spawn.merge(other.agent_spawn);
+        self.user_prompt_submit = self.user_prompt_submit.merge(other.user_prompt_submit);
+        self.pre_tool_use = self.pre_tool_use.merge(other.pre_tool_use);
+        self.post_tool_use = self.post_tool_use.merge(other.post_tool_use);
+        self.stop = self.stop.merge(other.stop);
         self
     }
 
     pub fn get(&self, trigger: HookTrigger) -> Option<Hook> {
         match trigger {
-            HookTrigger::AgentSpawn => self.agent_spawn.clone().map(Into::into),
-            HookTrigger::UserPromptSubmit => self.user_prompt_submit.clone().map(Into::into),
-            HookTrigger::PreToolUse => self.pre_tool_use.clone().map(Into::into),
-            HookTrigger::PostToolUse => self.post_tool_use.clone().map(Into::into),
-            HookTrigger::Stop => self.stop.clone().map(Into::into),
+            HookTrigger::AgentSpawn => match self.agent_spawn.command.is_empty() {
+                true => None,
+                false => Some(Hook::from(self.agent_spawn.clone())),
+            },
+            HookTrigger::UserPromptSubmit => match self.user_prompt_submit.command.is_empty() {
+                true => None,
+                false => Some(Hook::from(self.user_prompt_submit.clone())),
+            },
+            HookTrigger::PreToolUse => match self.pre_tool_use.command.is_empty() {
+                true => None,
+                false => Some(Hook::from(self.pre_tool_use.clone())),
+            },
+            HookTrigger::PostToolUse => match self.post_tool_use.command.is_empty() {
+                true => None,
+                false => Some(Hook::from(self.post_tool_use.clone())),
+            },
+            HookTrigger::Stop => match self.stop.command.is_empty() {
+                true => None,
+                false => Some(Hook::from(self.stop.clone())),
+            },
         }
     }
 }

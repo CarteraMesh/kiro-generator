@@ -56,7 +56,7 @@ impl Hash for Resource {
 }
 impl Eq for Resource {}
 
-#[derive(Decode, Clone, Default, Debug)]
+#[derive(Decode, Clone, Default, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct ToolAliasKdl {
     #[knuffel(argument)]
     from: String,
@@ -103,7 +103,7 @@ pub struct KdlAgent {
     #[knuffel(children(name = "mcp"), default)]
     mcp: Vec<CustomToolConfigKdl>,
     #[knuffel(children(name = "alias"), default)]
-    tool_aliases: Vec<ToolAliasKdl>,
+    pub(super) tool_aliases: HashSet<ToolAliasKdl>,
     /// Tools builtin to kiro
     #[knuffel(child, default)]
     native: NativeTools,

@@ -30,6 +30,8 @@ impl KdlAgent {
             (Some(a), Some(b)) => self.hook = Some(a.clone().merge(b)),
             _ => {}
         };
+
+        self.tool_aliases.extend(other.tool_aliases);
         self
     }
 }
@@ -54,6 +56,7 @@ mod tests {
                      cache-ttl-seconds 2
                  }
                }
+                alias "execute_bash" "shell"
             }
             agent "parent" {
                description "I am parent"
@@ -64,7 +67,8 @@ mod tests {
                prompt "i tell you what to do"
                model "claude"
                allowed-tools "write"
-
+               alias "execute_bash" "shell"
+               alias "fs_read" "read"
                hook {
                    agent-spawn {
                      timeout-ms 1111
@@ -143,6 +147,11 @@ mod tests {
         let h = h.unwrap();
         assert_eq!(h.command, "echo user submitted");
         assert_eq!(h.timeout_ms, 1000);
+
+        let alias = merged.tool_aliases();
+        assert_eq!(alias.len(), 2);
+        assert!(alias.contains_key("fs_read"));
+        assert!(alias.contains_key("execute_bash"));
         Ok(())
     }
 }

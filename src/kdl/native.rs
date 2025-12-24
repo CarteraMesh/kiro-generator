@@ -12,10 +12,10 @@ use {
 #[derive(Decode, Debug, Clone, Default)]
 pub(super) struct GenericList {
     #[knuffel(arguments)]
-    pub list: Vec<String>,
+    pub list: HashSet<String>,
 }
 
-#[derive(Decode, Debug, Clone, Default)]
+#[derive(Decode, Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(super) struct Force {
     #[knuffel(argument)]
     pub path: String,
@@ -23,121 +23,140 @@ pub(super) struct Force {
 
 #[derive(Decode, Clone, Debug, Default)]
 pub struct WriteTool {
-    #[knuffel(child)]
-    pub allow: Option<GenericList>,
-    #[knuffel(child)]
-    pub deny: Option<GenericList>,
+    #[knuffel(child, default)]
+    pub allow: GenericList,
+    #[knuffel(child, default)]
+    pub deny: GenericList,
     #[knuffel(children(name = "force"))]
-    pub force: Vec<Force>,
+    pub force: HashSet<Force>,
+}
+
+impl WriteTool {
+    fn merge(mut self, other: Self) -> Self {
+        self.allow.list.extend(other.allow.list);
+        self.deny.list.extend(other.deny.list);
+        self.force.extend(other.force);
+        self
+    }
 }
 
 #[derive(Decode, Clone, Debug, Default)]
 pub struct ReadTool {
-    #[knuffel(child)]
-    pub allow: Option<GenericList>,
-    #[knuffel(child)]
-    pub deny: Option<GenericList>,
+    #[knuffel(child, default)]
+    pub allow: GenericList,
+    #[knuffel(child, default)]
+    pub deny: GenericList,
     #[knuffel(children(name = "force"))]
-    pub force: Vec<Force>,
+    pub force: HashSet<Force>,
+}
+
+impl ReadTool {
+    fn merge(mut self, other: Self) -> Self {
+        self.allow.list.extend(other.allow.list);
+        self.deny.list.extend(other.deny.list);
+        self.force.extend(other.force);
+        self
+    }
 }
 
 #[derive(Decode, Debug, Default, Clone)]
 pub struct AwsTool {
-    #[knuffel(child)]
-    pub allow: Option<GenericList>,
-    #[knuffel(child)]
-    pub deny: Option<GenericList>,
+    #[knuffel(child, default)]
+    pub allow: GenericList,
+    #[knuffel(child, default)]
+    pub deny: GenericList,
+}
+
+impl AwsTool {
+    fn merge(mut self, other: Self) -> Self {
+        self.allow.list.extend(other.allow.list);
+        self.deny.list.extend(other.deny.list);
+        self
+    }
 }
 
 #[derive(Decode, Debug, Clone, Default)]
 pub struct ExecuteShellTool {
-    #[knuffel(child)]
-    pub allow: Option<GenericList>,
-    #[knuffel(child)]
-    pub deny: Option<GenericList>,
+    #[knuffel(child, default)]
+    pub allow: GenericList,
+    #[knuffel(child, default)]
+    pub deny: GenericList,
     #[knuffel(property)]
     pub deny_by_default: bool,
     #[knuffel(argument, default)]
     pub disable_auto_readonly: bool,
     #[knuffel(children(name = "force"))]
-    pub force: Vec<Force>,
+    pub force: HashSet<Force>,
+}
+
+impl ExecuteShellTool {
+    fn merge(mut self, other: Self) -> Self {
+        self.allow.list.extend(other.allow.list);
+        self.deny.list.extend(other.deny.list);
+        self.deny_by_default |= other.deny_by_default;
+        self.disable_auto_readonly |= other.disable_auto_readonly;
+        self.force.extend(other.force);
+        self
+    }
 }
 
 #[derive(Decode, Default, Clone, Debug)]
 pub struct NativeTools {
-    #[knuffel(child)]
-    shell: Option<ExecuteShellTool>,
-    #[knuffel(child)]
-    aws: Option<AwsTool>,
-    #[knuffel(child)]
-    read: Option<ReadTool>,
-    #[knuffel(child)]
-    write: Option<WriteTool>,
+    #[knuffel(child, default)]
+    shell: ExecuteShellTool,
+    #[knuffel(child, default)]
+    aws: AwsTool,
+    #[knuffel(child, default)]
+    read: ReadTool,
+    #[knuffel(child, default)]
+    write: WriteTool,
+}
+
+impl NativeTools {
+    pub fn merge(mut self, other: Self) -> Self {
+        self.shell = self.shell.merge(other.shell);
+        self.aws = self.aws.merge(other.aws);
+        self.read = self.read.merge(other.read);
+        self.write = self.write.merge(other.write);
+        self
+    }
 }
 
 impl From<&NativeTools> for KiroAwsTool {
     fn from(value: &NativeTools) -> Self {
-        match &value.aws {
-            None => KiroAwsTool::default(),
-            Some(t) => KiroAwsTool {
-                allowed_services: t.allow.clone().map_or(HashSet::default(), |f| {
-                    HashSet::from_iter(f.list.iter().cloned())
-                }),
-                denied_services: t.deny.clone().map_or(HashSet::default(), |f| {
-                    HashSet::from_iter(f.list.iter().cloned())
-                }),
-                auto_allow_readonly: true,
-            },
+        KiroAwsTool {
+            allowed_services: HashSet::from_iter(value.aws.allow.list.iter().cloned()),
+            denied_services: HashSet::from_iter(value.aws.deny.list.iter().cloned()),
+            auto_allow_readonly: true,
         }
     }
 }
 
 impl From<&NativeTools> for KiroWriteTool {
     fn from(value: &NativeTools) -> Self {
-        match &value.write {
-            None => KiroWriteTool::default(),
-            Some(t) => KiroWriteTool {
-                allowed_paths: t.allow.clone().map_or(HashSet::default(), |f| {
-                    HashSet::from_iter(f.list.iter().cloned())
-                }),
-                denied_paths: t.deny.clone().map_or(HashSet::default(), |f| {
-                    HashSet::from_iter(f.list.iter().cloned())
-                }),
-            },
+        KiroWriteTool {
+            allowed_paths: HashSet::from_iter(value.write.allow.list.iter().cloned()),
+            denied_paths: HashSet::from_iter(value.write.deny.list.iter().cloned()),
         }
     }
 }
 
 impl From<&NativeTools> for KiroReadTool {
     fn from(value: &NativeTools) -> Self {
-        match &value.read {
-            None => KiroReadTool::default(),
-            Some(t) => KiroReadTool {
-                allowed_paths: t.allow.clone().map_or(HashSet::default(), |f| {
-                    HashSet::from_iter(f.list.iter().cloned())
-                }),
-                denied_paths: t.deny.clone().map_or(HashSet::default(), |f| {
-                    HashSet::from_iter(f.list.iter().cloned())
-                }),
-            },
+        KiroReadTool {
+            allowed_paths: HashSet::from_iter(value.read.allow.list.iter().cloned()),
+            denied_paths: HashSet::from_iter(value.read.deny.list.iter().cloned()),
         }
     }
 }
 
 impl From<&NativeTools> for KiroShellTool {
     fn from(value: &NativeTools) -> Self {
-        match &value.shell {
-            None => KiroShellTool::default(),
-            Some(t) => KiroShellTool {
-                allowed_commands: t.allow.clone().map_or(HashSet::default(), |f| {
-                    HashSet::from_iter(f.list.iter().cloned())
-                }),
-                denied_commands: t.deny.clone().map_or(HashSet::default(), |f| {
-                    HashSet::from_iter(f.list.iter().cloned())
-                }),
-                deny_by_default: t.deny_by_default,
-                auto_allow_readonly: !t.disable_auto_readonly,
-            },
+        KiroShellTool {
+            allowed_commands: HashSet::from_iter(value.shell.allow.list.iter().cloned()),
+            denied_commands: HashSet::from_iter(value.shell.deny.list.iter().cloned()),
+            deny_by_default: value.shell.deny_by_default,
+            auto_allow_readonly: !value.shell.disable_auto_readonly,
         }
     }
 }
