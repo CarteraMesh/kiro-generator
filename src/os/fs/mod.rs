@@ -122,6 +122,12 @@ impl Fs {
                     fs.create_dir_all(ACTIVE_USER_HOME)
                         .await
                         .expect("failed to create test user home");
+                    let user_path = PathBuf::from(ACTIVE_USER_HOME)
+                        .join(".kiro")
+                        .join("generators");
+                    fs.create_dir_all(&user_path)
+                        .await
+                        .expect("failed to create test user home");
                     fs.create_dir_all("./.kiro").await.ok();
                     fs.create_dir_all("./.kiro/generators").await.ok();
                     fs.create_dir_all("./.kiro/agents").await.ok();
@@ -135,6 +141,17 @@ impl Fs {
                                 fs.write(format!("./.kiro/generators/{}", name), config)
                                     .await
                                     .ok();
+                            }
+                        }
+                    }
+                    if let Ok(entries) = std::fs::read_dir("./.kiro/global") {
+                        for entry in entries.flatten() {
+                            if let Ok(file_type) = entry.file_type()
+                                && file_type.is_file()
+                                && let Ok(config) = std::fs::read_to_string(entry.path())
+                                && let Some(name) = entry.file_name().to_str()
+                            {
+                                fs.write(user_path.join(name), config).await.ok();
                             }
                         }
                     }

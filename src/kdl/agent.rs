@@ -1,12 +1,17 @@
 use {
     super::{hook::HookPart, mcp::CustomToolConfigKdl},
     crate::{
-        agent::{CustomToolConfig, OriginalToolName, hook::HookTrigger},
+        agent::{
+            CustomToolConfig,
+            OriginalToolName,
+            hook::{Hook, HookTrigger},
+        },
         kdl::native::{AwsTool, ExecuteShellTool, NativeTools, ReadTool, WriteTool},
     },
     knuffel::Decode,
     std::{
         collections::{HashMap, HashSet},
+        fmt::{Debug, Display},
         hash::Hash,
     },
 };
@@ -56,15 +61,16 @@ pub(super) struct ToolAliasKdl {
     to: String,
 }
 
-#[derive(Decode, Clone, Debug)]
+#[derive(Decode, Clone, Default)]
 pub struct KdlAgent {
     /// Name of the agent
     #[knuffel(argument)]
     pub name: String,
+    /// Do not generate JSON Kiro agent, this is a "template" agent
+    #[knuffel(property, default)]
+    pub skeleton: Option<bool>,
     #[knuffel(child, unwrap(argument))]
     pub description: Option<String>,
-    #[knuffel(child, default)]
-    pub skeleton: bool,
     #[knuffel(child, default)]
     pub(super) inherits: Inherits,
     /// The intention for this field is to provide high level context to the
@@ -75,8 +81,8 @@ pub struct KdlAgent {
     /// Files to include in the agent's context
     #[knuffel(children(name = "resource"))]
     pub(super) resources: HashSet<Resource>,
-    #[knuffel(child, default)]
-    pub include_mcp_json: bool,
+    #[knuffel(child, default, unwrap(argument))]
+    pub include_mcp_json: Option<bool>,
     /// List of tools the agent can see. Use \"@{MCP_SERVER_NAME}/tool_name\" to
     /// specify tools from mcp servers. To include all tools from a server,
     /// use \"@{MCP_SERVER_NAME}\"
@@ -93,29 +99,56 @@ pub struct KdlAgent {
     #[knuffel(child)]
     pub(super) hook: Option<HookPart>,
     #[knuffel(children(name = "mcp"), default)]
-    mcp: Vec<CustomToolConfigKdl>,
+    pub(super) mcp: Vec<CustomToolConfigKdl>,
     #[knuffel(children(name = "alias"), default)]
     pub(super) tool_aliases: HashSet<ToolAliasKdl>,
     /// Tools builtin to kiro
     #[knuffel(child, default)]
-    pub(super) native: NativeTools,
+    pub(super) native_tool: NativeTools,
+}
+
+impl Debug for KdlAgent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl Display for KdlAgent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
 }
 
 impl KdlAgent {
+    pub fn new(name: impl AsRef<str>) -> Self {
+        Self {
+            name: name.as_ref().to_string(),
+            ..Default::default()
+        }
+    }
+
+    pub fn is_skeleton(&self) -> bool {
+        self.skeleton.is_some_and(|f| f)
+    }
+
+    pub fn include_mcp_json(&self) -> bool {
+        self.include_mcp_json.is_some_and(|f| f)
+    }
+
     pub fn get_tool_aws(&self) -> &AwsTool {
-        &self.native.aws
+        &self.native_tool.aws
     }
 
     pub fn get_tool_read(&self) -> &ReadTool {
-        &self.native.read
+        &self.native_tool.read
     }
 
     pub fn get_tool_write(&self) -> &WriteTool {
-        &self.native.write
+        &self.native_tool.write
     }
 
     pub fn get_tool_shell(&self) -> &ExecuteShellTool {
-        &self.native.shell
+        &self.native_tool.shell
     }
 
     pub fn tool_aliases(&self) -> HashMap<OriginalToolName, String> {
@@ -126,8 +159,11 @@ impl KdlAgent {
             .collect()
     }
 
-    pub fn hook(&self, trigger: HookTrigger) -> Option<crate::agent::hook::Hook> {
-        self.hook.as_ref().and_then(|h| h.get(trigger))
+    pub fn hooks(&self) -> HashMap<HookTrigger, Vec<Hook>> {
+        match &self.hook {
+            None => HashMap::new(),
+            Some(h) => h.triggers(),
+        }
     }
 
     pub fn allowed_tools(&self) -> HashSet<String> {

@@ -7,7 +7,9 @@ const DEFAULT_TIMEOUT_MS: u64 = 30_000;
 const DEFAULT_MAX_OUTPUT_SIZE: usize = 1024 * 10;
 const DEFAULT_CACHE_TTL_SECONDS: u64 = 0;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Hash, enum_iterator::Sequence,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum HookTrigger {
     /// Triggered during agent spawn

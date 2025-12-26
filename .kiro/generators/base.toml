@@ -1,4 +1,3 @@
-name = "default_agent_cli"
 description = "Default agent for Kiro"
 tools = ["*"]
 allowedTools = ["read", "knowledge", "@fetch"]

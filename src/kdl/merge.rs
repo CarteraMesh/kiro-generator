@@ -1,38 +1,35 @@
 use super::*;
 
 impl KdlAgent {
-    pub(super) fn merge(mut self, other: KdlAgent) -> Self {
-        self.include_mcp_json |= other.include_mcp_json;
+    pub fn merge(mut self, other: KdlAgent) -> Self {
+        // Child wins for explicit values
+        self.include_mcp_json = self.include_mcp_json.or(other.include_mcp_json);
+        self.skeleton = self.skeleton.or(other.skeleton);
+        self.description = self.description.or(other.description);
+        self.prompt = self.prompt.or(other.prompt);
+        self.model = self.model.or(other.model);
+
+        // Collections are extended (merged)
         self.resources.extend(other.resources);
         self.tools.tools.extend(other.tools.tools);
         self.allowed_tools
             .allowed
             .extend(other.allowed_tools.allowed);
-        if self.description.is_none()
-            && let Some(d) = other.description
-        {
-            self.description = Some(d);
-        }
-        if self.prompt.is_none()
-            && let Some(p) = other.prompt
-        {
-            self.prompt = Some(p);
-        }
+        self.tool_aliases.extend(other.tool_aliases);
+        self.mcp.extend(other.mcp);
+        self.inherits.parents.extend(other.inherits.parents);
 
-        if self.model.is_none()
-            && let Some(m) = other.model
-        {
-            self.model = Some(m);
-        }
-
-        match (&self.hook, other.hook) {
-            (None, Some(h)) => self.hook = Some(h),
-            (Some(a), Some(b)) => self.hook = Some(a.clone().merge(b)),
-            _ => {}
+        // Hooks are deep merged
+        self.hook = match (self.hook, other.hook) {
+            (None, Some(h)) => Some(h),
+            (Some(a), Some(b)) => Some(a.merge(b)),
+            (Some(a), None) => Some(a),
+            (None, None) => None,
         };
 
-        self.tool_aliases.extend(other.tool_aliases);
-        self.native = self.native.merge(other.native);
+        // Native tools are deep merged
+        self.native_tool = self.native_tool.merge(other.native_tool);
+
         self
     }
 }
@@ -44,14 +41,14 @@ mod tests {
     #[test_log::test]
     fn test_agent_merge() -> crate::Result<()> {
         let kdl_agents = r#"
-            agent "child" {
+            agent "child" skeleton=false {
                description "I am a child"
                resource "file://child.md"
                resource "file://README.md"
                inherits "parent"
-               include-mcp-json
+               include-mcp-json true
                tools "@awsdocs" "shell"
-               native {
+               native-tool {
                   write {
                     force  "Cargo.lock"
                   }
@@ -60,7 +57,7 @@ mod tests {
                   }
                }
                hook {
-                 agent-spawn {
+                 agent-spawn "spawn" {
                      command "echo i have spawned"
                      max-output-size 9000
                      cache-ttl-seconds 2
@@ -68,9 +65,8 @@ mod tests {
                }
                 alias "execute_bash" "shell"
             }
-            agent "parent" {
+            agent "parent" skeleton=true {
                description "I am parent"
-               skeleton
                resource "file://parent.md"
                resource "file://README.md"
                tools "web_search" "shell"
@@ -79,7 +75,7 @@ mod tests {
                allowed-tools "write"
                alias "execute_bash" "shell"
                alias "fs_read" "read"
-               native {
+               native-tool {
                  read {
                      allow "./src/*" "./scripts/**"
                      deny  "Cargo.lock"
@@ -95,21 +91,21 @@ mod tests {
                   }
                }
                hook {
-                   agent-spawn {
+                   agent-spawn "spawn" {
                      timeout-ms 1111
                    }
-                   user-prompt-submit {
+                   user-prompt-submit "submit" {
                        command "echo user submitted"
                        timeout-ms 1000
                    }
-                   pre-tool-use {
+                   pre-tool-use "pre" {
                        command "echo before tool"
                        matcher "git.*"
                    }
-                   post-tool-use {
+                   post-tool-use "post" {
                        command "echo after tool"
                    }
-                   stop {
+                   stop "stop" {
                        command "echo stopped"
                    }
                }
@@ -142,8 +138,8 @@ mod tests {
         assert_eq!(d, "I am a child");
 
         assert_eq!(merged.resources.len(), 3);
-        assert!(!merged.skeleton);
-        assert!(merged.include_mcp_json);
+        assert!(!merged.is_skeleton());
+        assert!(merged.include_mcp_json());
 
         assert_eq!(merged.inherits.parents.len(), 1);
         assert!(merged.inherits.parents.contains("parent"));
@@ -161,17 +157,21 @@ mod tests {
         assert_eq!(allowed_tools.len(), 1);
         assert!(allowed_tools.contains("write"));
 
-        let h = merged.hook(HookTrigger::AgentSpawn);
+        let hooks = merged.hooks();
+        assert!(!hooks.is_empty());
+        let h = hooks.get(&HookTrigger::AgentSpawn);
         assert!(h.is_some());
         let h = h.unwrap();
-        assert_eq!(h.timeout_ms, 1111);
-        assert_eq!(h.command, "echo i have spawned");
+        assert!(!h.is_empty());
+        assert_eq!(h[0].timeout_ms, 1111);
+        assert_eq!(h[0].command, "echo i have spawned");
 
-        let h = merged.hook(HookTrigger::UserPromptSubmit);
+        let h = hooks.get(&HookTrigger::UserPromptSubmit);
         assert!(h.is_some());
         let h = h.unwrap();
-        assert_eq!(h.command, "echo user submitted");
-        assert_eq!(h.timeout_ms, 1000);
+        assert!(!h.is_empty());
+        assert_eq!(h[0].command, "echo user submitted");
+        assert_eq!(h[0].timeout_ms, 1000);
 
         let alias = merged.tool_aliases();
         assert_eq!(alias.len(), 2);
@@ -194,6 +194,12 @@ mod tests {
         assert_eq!(tool.force.len(), 1);
         assert_eq!(tool.deny.list.len(), 1);
 
+        let tool = merged.get_tool_aws();
+        assert!(tool.allow.list.is_empty());
+        assert!(tool.deny.list.is_empty());
+
+        assert_eq!("child", format!("{merged}"));
+        assert_eq!("child", format!("{merged:?}"));
         Ok(())
     }
 }

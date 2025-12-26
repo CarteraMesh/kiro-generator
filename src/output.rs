@@ -3,11 +3,10 @@ use {
         Result,
         agent::{Agent, KgAgent, ToolTarget},
         generator::AgentResult,
-        os::Fs,
-        source::AgentSource,
+        source::KdlSources,
     },
     colored::Colorize,
-    std::{collections::HashMap, fmt::Display},
+    std::fmt::Display,
     super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
     tracing::enabled,
 };
@@ -83,12 +82,12 @@ impl OutputFormat {
         Ok(())
     }
 
-    pub fn sources(&self, fs: &Fs, sources: &HashMap<String, Vec<AgentSource>>) -> Result<()> {
+    pub fn sources(&self, sources: &KdlSources) -> Result<()> {
         if !enabled!(tracing::Level::DEBUG) {
             return Ok(());
         }
         match self {
-            Self::Table(color) => {
+            Self::Table(_color) => {
                 let mut table = Table::new();
                 table
                     .load_preset(UTF8_FULL)
@@ -102,7 +101,7 @@ impl OutputFormat {
                     ]);
                 for (name, agent_sources) in sources.iter() {
                     let mut row: Vec<Cell> = vec![Cell::new(name.to_string())];
-                    row.extend(agent_sources.iter().map(|s| s.to_cell(*color, fs)));
+                    row.extend(agent_sources.iter().map(|s| s.into()));
                     table.add_row(row);
                 }
                 eprintln!("{table}");

@@ -3,9 +3,66 @@ use {
     crate::merging_format::MergingTomlFormat,
     colored::Colorize,
     config::FileSourceString,
-    std::{fmt::Display, path::PathBuf},
+    std::{
+        collections::{HashMap, HashSet},
+        fmt::{Debug, Display},
+        ops::{Deref, DerefMut},
+        path::PathBuf,
+    },
     super_table::Cell,
 };
+
+#[derive(Clone)]
+pub enum KdlAgentSource {
+    LocalFile(PathBuf),
+    LocalInline,
+    GlobalFile(PathBuf),
+    GlobalInline,
+}
+
+impl From<&KdlAgentSource> for Cell {
+    fn from(value: &KdlAgentSource) -> Self {
+        match value {
+            KdlAgentSource::GlobalInline => Cell::new("global-inline"),
+            KdlAgentSource::GlobalFile(p) => Cell::new(format!("{}", p.display())),
+            KdlAgentSource::LocalInline => Cell::new("local-inline"),
+            KdlAgentSource::LocalFile(p) => Cell::new(format!("{}", p.display())),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct KdlSources(pub HashMap<String, Vec<KdlAgentSource>>);
+impl Debug for KdlSources {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "sources={}", self.0.len())
+    }
+}
+impl From<&HashSet<String>> for KdlSources {
+    fn from(value: &HashSet<String>) -> Self {
+        let mut sources = Self(HashMap::with_capacity(value.len()));
+        value.iter().for_each(|n| sources.add(n));
+        sources
+    }
+}
+impl KdlSources {
+    fn add(&mut self, name: &str) {
+        self.0.insert(name.to_string(), Vec::with_capacity(4));
+    }
+}
+impl Deref for KdlSources {
+    type Target = HashMap<String, Vec<KdlAgentSource>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for KdlSources {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 pub enum AgentSource {
     Raw(String),

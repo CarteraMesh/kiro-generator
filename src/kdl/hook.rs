@@ -1,12 +1,16 @@
 use {
     crate::agent::hook::{Hook, HookTrigger},
     knuffel::Decode,
+    std::collections::HashMap,
 };
 
 macro_rules! define_hook {
     ($name:ident) => {
-        #[derive(Decode, Default, Clone, Debug)]
+        #[derive(Decode, Default, Clone, Debug, PartialEq, Eq)]
         pub(super) struct $name {
+            /// The command to run when the hook is triggered
+            #[knuffel(argument)]
+            pub name: String,
             /// The command to run when the hook is triggered
             #[knuffel(child, default, unwrap(argument))]
             pub command: String,
@@ -72,52 +76,245 @@ define_hook!(HookPreToolUse);
 define_hook!(HookPostToolUse);
 define_hook!(HookStop);
 
-#[derive(Decode, Clone, Default, Debug)]
+#[derive(Decode, Clone, Default, Debug, PartialEq, Eq)]
 pub(super) struct HookPart {
-    #[knuffel(child, default)]
-    pub agent_spawn: HookAgentSpawn,
-    #[knuffel(child, default)]
-    pub user_prompt_submit: HookUserPromptSubmit,
-    #[knuffel(child, default)]
-    pub pre_tool_use: HookPreToolUse,
-    #[knuffel(child, default)]
-    pub post_tool_use: HookPostToolUse,
-    #[knuffel(child, default)]
-    pub stop: HookStop,
+    #[knuffel(children(name = "agent-spawn"), default)]
+    pub agent_spawn: Vec<HookAgentSpawn>,
+    #[knuffel(children(name = "user-prompt-submit"), default)]
+    pub user_prompt_submit: Vec<HookUserPromptSubmit>,
+    #[knuffel(children(name = "pre-tool-use"), default)]
+    pub pre_tool_use: Vec<HookPreToolUse>,
+    #[knuffel(children(name = "post-tool-use"), default)]
+    pub post_tool_use: Vec<HookPostToolUse>,
+    #[knuffel(children(name = "stop"), default)]
+    pub stop: Vec<HookStop>,
 }
 
 impl HookPart {
     pub fn merge(mut self, other: Self) -> Self {
-        self.agent_spawn = self.agent_spawn.merge(other.agent_spawn);
-        self.user_prompt_submit = self.user_prompt_submit.merge(other.user_prompt_submit);
-        self.pre_tool_use = self.pre_tool_use.merge(other.pre_tool_use);
-        self.post_tool_use = self.post_tool_use.merge(other.post_tool_use);
-        self.stop = self.stop.merge(other.stop);
+        match (self.agent_spawn.is_empty(), other.agent_spawn.is_empty()) {
+            (false, false) => {
+                let mut hooks = Vec::with_capacity(self.agent_spawn.len());
+                for h in self.agent_spawn {
+                    if let Some(o) = other.agent_spawn.iter().find(|i| i.name == h.name) {
+                        hooks.push(h.merge(o.clone()));
+                    }
+                }
+                self.agent_spawn = hooks;
+            }
+            (true, false) => self.agent_spawn = other.agent_spawn,
+            _ => {}
+        };
+
+        match (
+            self.user_prompt_submit.is_empty(),
+            other.user_prompt_submit.is_empty(),
+        ) {
+            (false, false) => {
+                let mut hooks = Vec::with_capacity(self.user_prompt_submit.len());
+                for h in self.user_prompt_submit {
+                    if let Some(o) = other.user_prompt_submit.iter().find(|i| i.name.eq(&h.name)) {
+                        hooks.push(h.merge(o.clone()));
+                    }
+                }
+                self.user_prompt_submit = hooks;
+            }
+            (true, false) => self.user_prompt_submit = other.user_prompt_submit,
+            _ => {}
+        };
+
+        match (self.pre_tool_use.is_empty(), other.pre_tool_use.is_empty()) {
+            (false, false) => {
+                let mut hooks = Vec::with_capacity(self.pre_tool_use.len());
+                for h in self.pre_tool_use {
+                    if let Some(o) = other.pre_tool_use.iter().find(|i| i.name.eq(&h.name)) {
+                        hooks.push(h.merge(o.clone()));
+                    }
+                }
+                self.pre_tool_use = hooks;
+            }
+            (true, false) => self.pre_tool_use = other.pre_tool_use,
+            _ => {}
+        };
+
+        match (
+            self.post_tool_use.is_empty(),
+            other.post_tool_use.is_empty(),
+        ) {
+            (false, false) => {
+                let mut hooks = Vec::with_capacity(self.post_tool_use.len());
+                for h in self.post_tool_use {
+                    if let Some(o) = other.post_tool_use.iter().find(|i| i.name.eq(&h.name)) {
+                        hooks.push(h.merge(o.clone()));
+                    }
+                }
+                self.post_tool_use = hooks;
+            }
+            (true, false) => self.post_tool_use = other.post_tool_use,
+            _ => {}
+        };
+
+        match (self.stop.is_empty(), other.stop.is_empty()) {
+            (false, false) => {
+                let mut hooks = Vec::with_capacity(self.stop.len());
+                for h in self.stop {
+                    if let Some(o) = other.stop.iter().find(|i| i.name.eq(&h.name)) {
+                        hooks.push(h.merge(o.clone()));
+                    }
+                }
+                self.stop = hooks;
+            }
+            (true, false) => self.stop = other.stop,
+            _ => {}
+        };
         self
     }
 
-    pub fn get(&self, trigger: HookTrigger) -> Option<Hook> {
-        match trigger {
-            HookTrigger::AgentSpawn => match self.agent_spawn.command.is_empty() {
-                true => None,
-                false => Some(Hook::from(self.agent_spawn.clone())),
-            },
-            HookTrigger::UserPromptSubmit => match self.user_prompt_submit.command.is_empty() {
-                true => None,
-                false => Some(Hook::from(self.user_prompt_submit.clone())),
-            },
-            HookTrigger::PreToolUse => match self.pre_tool_use.command.is_empty() {
-                true => None,
-                false => Some(Hook::from(self.pre_tool_use.clone())),
-            },
-            HookTrigger::PostToolUse => match self.post_tool_use.command.is_empty() {
-                true => None,
-                false => Some(Hook::from(self.post_tool_use.clone())),
-            },
-            HookTrigger::Stop => match self.stop.command.is_empty() {
-                true => None,
-                false => Some(Hook::from(self.stop.clone())),
-            },
+    pub fn triggers(&self) -> HashMap<HookTrigger, Vec<Hook>> {
+        let trigger: Vec<HookTrigger> = enum_iterator::all::<HookTrigger>().collect();
+        let mut hooks: HashMap<HookTrigger, Vec<Hook>> = HashMap::new();
+        for t in trigger {
+            match t {
+                HookTrigger::AgentSpawn => {
+                    hooks.insert(
+                        t,
+                        self.agent_spawn
+                            .clone()
+                            .into_iter()
+                            .map(Hook::from)
+                            .collect(),
+                    );
+                }
+                HookTrigger::UserPromptSubmit => {
+                    hooks.insert(
+                        t,
+                        self.user_prompt_submit
+                            .clone()
+                            .into_iter()
+                            .map(Hook::from)
+                            .collect(),
+                    );
+                }
+                HookTrigger::PreToolUse => {
+                    hooks.insert(
+                        t,
+                        self.pre_tool_use
+                            .clone()
+                            .into_iter()
+                            .map(Hook::from)
+                            .collect(),
+                    );
+                }
+                HookTrigger::PostToolUse => {
+                    hooks.insert(
+                        t,
+                        self.post_tool_use
+                            .clone()
+                            .into_iter()
+                            .map(Hook::from)
+                            .collect(),
+                    );
+                }
+                HookTrigger::Stop => {
+                    hooks.insert(t, self.stop.clone().into_iter().map(Hook::from).collect());
+                }
+            };
         }
+        hooks
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, crate::Result};
+
+    macro_rules! rando_hook {
+        ($name:ident) => {
+            impl $name {
+                fn rando() -> $name {
+                    let value = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+                    Self {
+                        name: format!("{value}"),
+                        command: format!("{value}"),
+                        timeout_ms: value,
+                        max_output_size: 0,
+                        cache_ttl_seconds: value,
+                        matcher: Some(format!("{value}")),
+                    }
+                }
+            }
+        };
+    }
+    rando_hook!(HookAgentSpawn);
+    rando_hook!(HookUserPromptSubmit);
+    rando_hook!(HookPreToolUse);
+    rando_hook!(HookPostToolUse);
+    rando_hook!(HookStop);
+
+    impl HookPart {
+        pub fn randomize() -> Self {
+            Self {
+                agent_spawn: vec![HookAgentSpawn::rando()],
+                user_prompt_submit: vec![HookUserPromptSubmit::rando()],
+                pre_tool_use: vec![HookPreToolUse::rando()],
+                post_tool_use: vec![HookPostToolUse::rando()],
+                stop: vec![HookStop::rando()],
+            }
+        }
+    }
+
+    impl HookAgentSpawn {
+        fn randojkh() -> Self {
+            let value = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            Self {
+                name: format!("{value}"),
+                command: format!("{value}"),
+                timeout_ms: value,
+                max_output_size: 0,
+                cache_ttl_seconds: value,
+                matcher: Some(format!("{value}")),
+            }
+        }
+    }
+
+    #[test_log::test]
+    pub fn test_hooks_empty() -> Result<()> {
+        let child = HookPart::default();
+        let parent = HookPart::default();
+        let merged = child.merge(parent);
+
+        assert!(merged.agent_spawn.is_empty());
+        assert!(merged.user_prompt_submit.is_empty());
+        assert!(merged.pre_tool_use.is_empty());
+        assert!(merged.post_tool_use.is_empty());
+        assert!(merged.stop.is_empty());
+        Ok(())
+    }
+
+    #[test_log::test]
+    pub fn test_hooks_empty_child() -> Result<()> {
+        let child = HookPart::default();
+        let parent = HookPart::randomize();
+        let before = parent.clone();
+        let merged = child.merge(parent);
+
+        assert_eq!(merged, before);
+        Ok(())
+    }
+
+    #[test_log::test]
+    pub fn test_hooks_no_merge() -> Result<()> {
+        let child = HookPart::randomize();
+        let parent = HookPart::randomize();
+        let before = child.clone();
+        let merged = child.merge(parent);
+        assert_eq!(merged, before);
+        Ok(())
     }
 }

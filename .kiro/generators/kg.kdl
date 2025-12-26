@@ -1,16 +1,10 @@
-agent "base" {
-    skeleton
-}
-
+agent "base" skeleton=true {}
 agent "aws-test" {
-    inherits base
-    hooks {
+    inherits "base"
+    hook {
         agent-spawn "whoami" {
             command "aws get caller-identity"
         }
     }
 }
-
-agent "dependabot" {
-    inherits "aws-test"
-}
+agent "dependabot" { inherits "aws-test"; }
