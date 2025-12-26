@@ -51,12 +51,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
+nix = { version = "0.30.1", features = ["user"] }
 
 [profile.release]
 strip = false          # Keep symbols for better backtraces
 debug = 1              # Line numbers only (smaller than full debug=2)
 lto = "thin"           # Faster builds than "fat", still good optimization
 codegen-units = 16     # Default, balances compile time vs optimization
-
-[lints.rust]
-dead_code = "allow"

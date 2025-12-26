@@ -1,0 +1,3 @@
+agent "base" skeleton=true {}
+agent "aws-test" { inherits "base"; }
+agent "dependabot" { }

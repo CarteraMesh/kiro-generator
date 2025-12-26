@@ -3,6 +3,7 @@ use {
     crate::merging_format::MergingTomlFormat,
     colored::Colorize,
     config::FileSourceString,
+    serde::Serialize,
     std::{
         collections::{HashMap, HashSet},
         fmt::{Debug, Display},
@@ -12,12 +13,18 @@ use {
     super_table::Cell,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub enum KdlAgentSource {
     LocalFile(PathBuf),
     LocalInline,
     GlobalFile(PathBuf),
     GlobalInline,
+}
+
+impl KdlAgentSource {
+    fn is_local(&self) -> bool {
+        matches!(self, Self::LocalFile(_) | Self::LocalInline)
+    }
 }
 
 impl From<&KdlAgentSource> for Cell {
@@ -31,7 +38,7 @@ impl From<&KdlAgentSource> for Cell {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct KdlSources(pub HashMap<String, Vec<KdlAgentSource>>);
 impl Debug for KdlSources {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -46,10 +53,18 @@ impl From<&HashSet<String>> for KdlSources {
     }
 }
 impl KdlSources {
+    pub fn is_local(&self, name: impl AsRef<str>) -> bool {
+        if let Some(a) = self.get(name.as_ref()) {
+            return a.iter().find(|p| p.is_local()).is_some();
+        }
+        false
+    }
+
     fn add(&mut self, name: &str) {
         self.0.insert(name.to_string(), Vec::with_capacity(4));
     }
 }
+
 impl Deref for KdlSources {
     type Target = HashMap<String, Vec<KdlAgentSource>>;
 

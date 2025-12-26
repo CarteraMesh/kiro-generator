@@ -82,8 +82,7 @@ impl KgConfig {
 #[derive(Serialize)]
 pub struct Generator {
     global_path: PathBuf,
-    agents: HashMap<String, KgAgent>,
-    local_agents: HashSet<String>, // Agents defined in local kg.toml
+    resolved: discover::ResolvedAgents,
     #[serde(skip)]
     fs: Fs,
     #[serde(skip)]
@@ -97,7 +96,7 @@ impl Debug for Generator {
             "global_path={} exists={} local_agents={}",
             self.global_path.display(),
             self.fs.exists(&self.global_path),
-            self.local_agents.len()
+            self.resolved.has_local
         )
     }
 }
@@ -110,11 +109,10 @@ impl Generator {
         format: crate::output::OutputFormat,
     ) -> Result<Self> {
         let global_path = location.global_kg();
-        let (agents, local_agents) = discover::agents(&fs, &location, &format)?;
+        let resolved = discover::discover(&fs, &location, &format)?;
         Ok(Self {
             global_path,
-            agents,
-            local_agents,
+            resolved,
             fs,
             format,
         })
@@ -122,7 +120,7 @@ impl Generator {
 
     /// Check if an agent is defined in local kg.toml
     pub fn is_local(&self, agent_name: impl AsRef<str>) -> bool {
-        self.local_agents.contains(agent_name.as_ref())
+        self.resolved.sources.is_local(agent_name)
     }
 
     /// Get the destination directory for an agent (global or local)
@@ -141,7 +139,7 @@ impl Generator {
         let mut results = Vec::with_capacity(agents.len());
         // If no local agents defined, write all (global) agents
         // If local agents exist, only write those
-        let write_all_agents = self.local_agents.is_empty();
+        let write_all_agents = self.resolved.has_local;
         for agent in agents {
             if write_all_agents || self.is_local(&agent.name) {
                 results.push(self.write(agent, dry_run).await?);
@@ -185,152 +183,5 @@ impl Generator {
                 .with_context(|| format!("failed to write file {}", out.display()))?;
         }
         Ok(result)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use {
-        super::*,
-        crate::{
-            agent::{Agent, AwsTool, ExecuteShellTool, ToolTarget, WriteTool, hook::HookTrigger},
-            output::OutputFormat,
-        },
-    };
-
-    // #[tokio::test]
-    // #[test_log::test]
-    // async fn test_discover_agents() -> Result<()> {
-    //     let fs = Fs::new();
-    //     match _discover_agents(fs.clone()).await {
-    //         Ok(_) => Ok(()),
-    //         Err(e) => {
-    //             let dest = PathBuf::from(".kiro").join("agents");
-    //             if fs.exists(&dest) {
-    //                 let _dir = fs.read_dir(&dest).await?;
-    //                 // TODO spit contents via tracing::error
-    //             }
-    //             Err(e)
-    //         }
-    //     }
-    // }
-
-    async fn _discover_agents(fs: Fs) -> Result<()> {
-        let location = ConfigLocation::Local;
-        let generator = Generator::new(fs.clone(), location, OutputFormat::default())?;
-        assert!(!generator.agents.is_empty());
-        assert_eq!(3, generator.agents.len());
-        assert_eq!(3, generator.local_agents.len());
-        // Check that base agent exists and is a skeleton
-        assert!(generator.agents.contains_key("base"));
-        if let Some(base) = generator.agents.get("base") {
-            assert!(base.skeleton());
-        }
-        tracing::debug!(
-            "Loaded Agent Generator Config:\n{}",
-            serde_json::to_string_pretty(&generator)?
-        );
-        let results = generator.write_all(false).await?;
-
-        for r in &results {
-            let agent = &r.agent;
-            let destination = PathBuf::from(".kiro")
-                .join("agents")
-                .join(format!("{}.json", agent.name));
-            tracing::info!("checking output at {}", destination.as_os_str().display());
-            //            tracing::info!("{}",
-            // serde_json::to_string_pretty(agent).unwrap());
-            if agent.skeleton() {
-                assert!(!fs.exists(&destination));
-            } else {
-                assert!(fs.exists(&destination));
-            }
-        }
-        let content = fs
-            .read_to_string(PathBuf::from(".kiro").join("agents").join("aws-test.json"))
-            .await?;
-        let kiro_agent: Agent = serde_json::from_str(&content)?;
-        assert_eq!("aws-test", kiro_agent.name);
-        assert_eq!(
-            "all the AWS tools you want",
-            kiro_agent.description.clone().unwrap_or_default()
-        );
-        assert!(kiro_agent.model.is_none());
-        assert_eq!(
-            "you are an AWS expert",
-            kiro_agent.prompt.clone().unwrap_or_default()
-        );
-        assert_eq!(1, kiro_agent.tools.len());
-        assert!(kiro_agent.tools.contains("*"));
-        tracing::info!("{:?}", kiro_agent.allowed_tools);
-        assert_eq!(4, kiro_agent.allowed_tools.len());
-        let allowed_tools = ["read", "knowledge", "@fetch", "@awsdocs"];
-        for tool in allowed_tools {
-            assert!(kiro_agent.allowed_tools.contains(tool));
-        }
-        tracing::info!("{:?}", kiro_agent.mcp_servers.mcp_servers.keys());
-        assert_eq!(4, kiro_agent.mcp_servers.mcp_servers.len());
-        for mcp in ["awsbilling", "awsdocs", "cargo", "rustdocs"] {
-            assert!(kiro_agent.mcp_servers.mcp_servers.contains_key(mcp));
-        }
-
-        tracing::info!("{:?}", kiro_agent.resources);
-        assert_eq!(3, kiro_agent.resources.len());
-        for r in [
-            "file://.amazonq/rules/**/*.md",
-            "file://AGENTS.md",
-            "file://README.md",
-        ] {
-            assert!(kiro_agent.resources.contains(r));
-        }
-
-        tracing::info!("{:?}", kiro_agent.tools_settings.keys());
-        assert_eq!(4, kiro_agent.tools_settings.len());
-        let aws_tool: AwsTool = kiro_agent.get_tool(ToolTarget::Aws);
-        tracing::info!("{:?}", aws_tool);
-        assert!(aws_tool.auto_allow_readonly);
-        assert_eq!(2, aws_tool.allowed_services.len());
-        assert_eq!(1, aws_tool.denied_services.len());
-        assert!(aws_tool.allowed_services.contains("ec2"));
-        assert!(aws_tool.allowed_services.contains("s3"));
-        assert!(aws_tool.denied_services.contains("iam"));
-
-        assert!(kiro_agent.tool_aliases.is_empty());
-
-        let content = fs
-            .read_to_string(
-                PathBuf::from(".kiro")
-                    .join("agents")
-                    .join("dependabot.json"),
-            )
-            .await?;
-        let dependabot: Agent = serde_json::from_str(&content)?;
-        assert_eq!("dependabot", dependabot.name);
-        assert!(dependabot.mcp_servers.mcp_servers.contains_key("rustdocs"));
-        assert!(dependabot.mcp_servers.mcp_servers.contains_key("cargo"));
-        let exec_tool: ExecuteShellTool = dependabot.get_tool(ToolTarget::Shell);
-        tracing::info!("{:?}", exec_tool);
-        assert!(exec_tool.allowed_commands.contains("git commit .*"));
-        assert!(exec_tool.allowed_commands.contains("git push .*"));
-        assert!(!exec_tool.denied_commands.contains("git commit .*"));
-        assert!(!exec_tool.denied_commands.contains("git push .*"));
-
-        let fs_tool: WriteTool = dependabot.get_tool(ToolTarget::Write);
-        tracing::info!("{:?}", fs_tool);
-        assert!(fs_tool.allowed_paths.contains(".*Cargo.toml.*"));
-        assert!(!fs_tool.denied_paths.contains(".*Cargo.toml.*"));
-
-        tracing::info!("{:?}", dependabot.hooks);
-        assert_eq!(2, dependabot.hooks.len());
-        assert!(dependabot.hooks.contains_key(&HookTrigger::AgentSpawn));
-        assert_eq!(
-            2,
-            dependabot
-                .hooks
-                .get(&HookTrigger::AgentSpawn)
-                .unwrap()
-                .len()
-        );
-        Ok(())
     }
 }
