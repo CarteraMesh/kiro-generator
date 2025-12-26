@@ -114,6 +114,10 @@ impl From<&KdlAgent> for Agent {
         if tool != ExecuteShellTool::default() {
             tools_settings.insert(ToolTarget::Shell, serde_json::to_value(&tool).unwrap());
         }
+        let default_agent = Self::default();
+        let tools = value.tools().clone();
+        let allowed_tools = value.allowed_tools().clone();
+        let resources: HashSet<String> = value.resources().map(|s| s.to_string()).collect();
 
         Self {
             name: value.name.clone(),
@@ -122,10 +126,22 @@ impl From<&KdlAgent> for Agent {
             mcp_servers: McpServerConfig {
                 mcp_servers: value.mcp_servers(),
             },
-            tools: value.tools().clone(),
+            tools: if tools.is_empty() {
+                default_agent.tools
+            } else {
+                tools
+            },
             tool_aliases: value.tool_aliases(),
-            allowed_tools: value.allowed_tools().clone(),
-            resources: value.resources().map(|s| s.to_string()).collect(),
+            allowed_tools: if allowed_tools.is_empty() {
+                default_agent.allowed_tools
+            } else {
+                allowed_tools
+            },
+            resources: if resources.is_empty() {
+                default_agent.resources
+            } else {
+                resources
+            },
             hooks: value.hooks(),
             tools_settings,
             model: value.model.clone(),

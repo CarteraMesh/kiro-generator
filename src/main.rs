@@ -16,8 +16,6 @@ use {
 };
 pub type Result<T> = color_eyre::Result<T>;
 
-pub const DEFAULT_AGENT_RESOURCES: &[&str] = &["file://AGENTS.md", "file://README.md"];
-
 fn init_tracing(debug: bool, trace_agent: Option<&str>) {
     let filter = if let Some(agent) = trace_agent {
         let directive = if agent == "all" {
