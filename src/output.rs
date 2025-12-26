@@ -162,10 +162,10 @@ impl OutputFormat {
         }
         row.add_cell(Cell::new(enabled_tools.join(", ")));
 
-        // Forced permissions (security-critical)
-        let sh = result.forced(&ToolTarget::Shell);
-        let read = result.forced(&ToolTarget::Read);
-        let write = result.forced(&ToolTarget::Write);
+        // Override permissions (security-critical)
+        let sh = result.overrides(&ToolTarget::Shell);
+        let read = result.overrides(&ToolTarget::Read);
+        let write = result.overrides(&ToolTarget::Write);
 
         let mut forced = vec![];
         if let Some(c) = serialize_yaml("cmds:\n", &sh) {
@@ -249,7 +249,7 @@ impl OutputFormat {
                             Color::Yellow,
                         ),
                         self.maybe_color(
-                            Cell::new("Forced Permissions")
+                            Cell::new("Override (Allowed) Permissions")
                                 .set_colspan(3)
                                 .set_alignment(CellAlignment::Center),
                             Color::Yellow,
@@ -262,7 +262,7 @@ impl OutputFormat {
                         Cell::new(format!("MCP {}", emojis_rs::EMOJI_COMPUTER)),
                         Cell::new(format!("Allowed Tools {}", emojis_rs::EMOJI_GEAR)),
                         Cell::new(format!("Resources {}", emojis_rs::EMOJI_DOCUMENT)),
-                        Cell::new("Forced Permissions")
+                        Cell::new("Override (Allowed) Permissions")
                             .set_colspan(3)
                             .set_alignment(CellAlignment::Center),
                     ]);

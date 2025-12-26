@@ -50,10 +50,10 @@ mod tests {
                tools "@awsdocs" "shell"
                native-tool {
                   write {
-                    force  "Cargo.lock"
+                    override  "Cargo.lock"
                   }
                   shell {
-                    force  "git push .*"
+                    override  "git push .*"
                   }
                }
                hook {
@@ -179,19 +179,19 @@ mod tests {
         assert!(alias.contains_key("execute_bash"));
 
         let tool = merged.get_tool_write();
-        assert!(tool.force.contains(&"Cargo.lock".into()));
+        assert!(tool.override_path.contains(&"Cargo.lock".into()));
         assert_eq!(tool.allow.list.len(), 2);
-        assert_eq!(tool.force.len(), 1);
+        assert_eq!(tool.override_path.len(), 1);
         assert_eq!(tool.deny.list.len(), 1);
 
         let tool = merged.get_tool_read();
         assert_eq!(tool.allow.list.len(), 2);
-        assert_eq!(tool.force.len(), 0);
+        assert_eq!(tool.override_path.len(), 0);
         assert_eq!(tool.deny.list.len(), 1);
 
         let tool = merged.get_tool_shell();
         assert_eq!(tool.allow.list.len(), 2);
-        assert_eq!(tool.force.len(), 1);
+        assert_eq!(tool.override_command.len(), 1);
         assert_eq!(tool.deny.list.len(), 1);
 
         let tool = merged.get_tool_aws();

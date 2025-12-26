@@ -32,12 +32,12 @@ impl AgentResult {
         self.agent.is_template()
     }
 
-    pub fn forced(&self, target: &ToolTarget) -> Vec<String> {
+    pub fn overrides(&self, target: &ToolTarget) -> Vec<String> {
         match target {
             ToolTarget::Read => self
                 .agent
                 .get_tool_read()
-                .force
+                .override_path
                 .iter()
                 .cloned()
                 .map(|f| f.to_string())
@@ -45,7 +45,7 @@ impl AgentResult {
             ToolTarget::Write => self
                 .agent
                 .get_tool_write()
-                .force
+                .override_path
                 .iter()
                 .cloned()
                 .map(|f| f.to_string())
@@ -53,7 +53,7 @@ impl AgentResult {
             ToolTarget::Shell => self
                 .agent
                 .get_tool_shell()
-                .force
+                .override_command
                 .iter()
                 .cloned()
                 .map(|f| f.to_string())

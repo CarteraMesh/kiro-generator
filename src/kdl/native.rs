@@ -32,18 +32,18 @@ impl FromIterator<&'static str> for GenericList {
 }
 
 #[derive(Decode, Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Force {
+pub struct Override {
     #[knuffel(argument)]
     pub path: String,
 }
 
-impl Display for Force {
+impl Display for Override {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.path)
     }
 }
 
-impl From<&str> for Force {
+impl From<&str> for Override {
     fn from(value: &str) -> Self {
         Self {
             path: value.to_string(),
@@ -57,15 +57,15 @@ pub struct WriteTool {
     pub allow: GenericList,
     #[knuffel(child, default)]
     pub deny: GenericList,
-    #[knuffel(children(name = "force"))]
-    pub force: HashSet<Force>,
+    #[knuffel(children(name = "override"))]
+    pub override_path: HashSet<Override>,
 }
 
 impl WriteTool {
     fn merge(mut self, other: Self) -> Self {
         self.allow.list.extend(other.allow.list);
         self.deny.list.extend(other.deny.list);
-        self.force.extend(other.force);
+        self.override_path.extend(other.override_path);
         self
     }
 }
@@ -76,15 +76,15 @@ pub struct ReadTool {
     pub allow: GenericList,
     #[knuffel(child, default)]
     pub deny: GenericList,
-    #[knuffel(children(name = "force"))]
-    pub force: HashSet<Force>,
+    #[knuffel(children(name = "override"))]
+    pub override_path: HashSet<Override>,
 }
 
 impl ReadTool {
     fn merge(mut self, other: Self) -> Self {
         self.allow.list.extend(other.allow.list);
         self.deny.list.extend(other.deny.list);
-        self.force.extend(other.force);
+        self.override_path.extend(other.override_path);
         self
     }
 }
@@ -118,8 +118,8 @@ pub struct ExecuteShellTool {
     pub deny_by_default: Option<bool>,
     #[knuffel(property)]
     pub disable_auto_readonly: Option<bool>,
-    #[knuffel(children(name = "force"))]
-    pub force: HashSet<Force>,
+    #[knuffel(children(name = "override"))]
+    pub override_command: HashSet<Override>,
 }
 
 impl ExecuteShellTool {
@@ -128,7 +128,7 @@ impl ExecuteShellTool {
         self.deny.list.extend(other.deny.list);
         self.deny_by_default = self.deny_by_default.or(other.deny_by_default);
         self.disable_auto_readonly = self.disable_auto_readonly.or(other.disable_auto_readonly);
-        self.force.extend(other.force);
+        self.override_command.extend(other.override_command);
         self
     }
 }
@@ -172,12 +172,12 @@ impl From<&NativeTools> for KiroWriteTool {
     fn from(value: &NativeTools) -> Self {
         let mut allow: HashSet<String> = HashSet::from_iter(value.write.allow.list.iter().cloned());
         let mut deny: HashSet<String> = HashSet::from_iter(value.write.deny.list.iter().cloned());
-        if !value.write.force.is_empty() {
+        if !value.write.override_path.is_empty() {
             tracing::trace!(
-                "Applying forced write: {:?}",
-                value.shell.force.iter().collect::<Vec<_>>()
+                "Override/Forcing write: {:?}",
+                value.shell.override_command.iter().collect::<Vec<_>>()
             );
-            for cmd in value.write.force.iter() {
+            for cmd in value.write.override_path.iter() {
                 allow.insert(cmd.path.clone());
                 if deny.remove(&cmd.path) {
                     tracing::trace!("Removed from deny: {cmd}");
@@ -195,12 +195,12 @@ impl From<&NativeTools> for KiroReadTool {
     fn from(value: &NativeTools) -> Self {
         let mut allow: HashSet<String> = HashSet::from_iter(value.read.allow.list.iter().cloned());
         let mut deny: HashSet<String> = HashSet::from_iter(value.read.deny.list.iter().cloned());
-        if !value.read.force.is_empty() {
+        if !value.read.override_path.is_empty() {
             tracing::trace!(
-                "Applying forced read: {:?}",
-                value.shell.force.iter().collect::<Vec<_>>()
+                "Override/Forcing read: {:?}",
+                value.shell.override_command.iter().collect::<Vec<_>>()
             );
-            for cmd in value.read.force.iter() {
+            for cmd in value.read.override_path.iter() {
                 allow.insert(cmd.path.clone());
                 if deny.remove(&cmd.path) {
                     tracing::trace!("Removed from deny: {cmd}");
@@ -218,12 +218,12 @@ impl From<&NativeTools> for KiroShellTool {
     fn from(value: &NativeTools) -> Self {
         let mut allow: HashSet<String> = HashSet::from_iter(value.shell.allow.list.iter().cloned());
         let mut deny: HashSet<String> = HashSet::from_iter(value.shell.deny.list.iter().cloned());
-        if !value.shell.force.is_empty() {
+        if !value.shell.override_command.is_empty() {
             tracing::trace!(
-                "Applying force commands: {:?}",
-                value.shell.force.iter().collect::<Vec<_>>()
+                "Override/Forcing commands: {:?}",
+                value.shell.override_command.iter().collect::<Vec<_>>()
             );
-            for cmd in value.shell.force.iter() {
+            for cmd in value.shell.override_command.iter() {
                 allow.insert(cmd.path.clone());
                 if deny.remove(&cmd.path) {
                     tracing::trace!("Removed command from deny: {cmd}");
@@ -268,7 +268,7 @@ mod tests {
         let shell = ExecuteShellTool {
             allow: vec!["ls .*"].into_iter().collect(),
             deny: vec!["git push"].into_iter().collect(),
-            force: HashSet::from_iter(vec![Force::from("rm -rf /")]),
+            override_command: HashSet::from_iter(vec![Override::from("rm -rf /")]),
             deny_by_default: Some(true),
             disable_auto_readonly: Some(false),
         };
@@ -276,12 +276,12 @@ mod tests {
         let read = ReadTool {
             allow: vec!["ls .*"].into_iter().collect(),
             deny: vec!["git push"].into_iter().collect(),
-            force: HashSet::from_iter(vec![Force::from("rm -rf /")]),
+            override_path: HashSet::from_iter(vec![Override::from("rm -rf /")]),
         };
         let write = WriteTool {
             allow: vec!["ls .*"].into_iter().collect(),
             deny: vec!["git push"].into_iter().collect(),
-            force: HashSet::from_iter(vec![Force::from("rm -rf /")]),
+            override_path: HashSet::from_iter(vec![Override::from("rm -rf /")]),
         };
         parent.aws = aws.clone();
         parent.shell = shell.clone();
@@ -307,7 +307,7 @@ mod tests {
             shell: ExecuteShellTool {
                 allow: vec!["ls .*"].into_iter().collect(),
                 deny: vec!["git push"].into_iter().collect(),
-                force: HashSet::from_iter(vec![Force::from("rm -rf /")]),
+                override_command: HashSet::from_iter(vec![Override::from("rm -rf /")]),
                 deny_by_default: Some(true),
                 disable_auto_readonly: Some(false),
             },
@@ -315,12 +315,12 @@ mod tests {
             read: ReadTool {
                 allow: vec!["ls .*"].into_iter().collect(),
                 deny: vec!["git push"].into_iter().collect(),
-                force: HashSet::from_iter(vec![Force::from("rm -rf /")]),
+                override_path: HashSet::from_iter(vec![Override::from("rm -rf /")]),
             },
             write: WriteTool {
                 allow: vec!["ls .*"].into_iter().collect(),
                 deny: vec!["git push"].into_iter().collect(),
-                force: HashSet::from_iter(vec![Force::from("rm -rf /")]),
+                override_path: HashSet::from_iter(vec![Override::from("rm -rf /")]),
             },
         };
 
@@ -413,7 +413,7 @@ mod tests {
                 deny: "rm".into(),
                 deny_by_default: None,
                 disable_auto_readonly: None,
-                force: HashSet::from_iter(vec!["rm".into()]),
+                override_command: HashSet::from_iter(vec!["rm".into()]),
             },
             ..Default::default()
         };
@@ -439,7 +439,7 @@ mod tests {
             read: ReadTool {
                 allow: "ls".into(),
                 deny: "rm".into(),
-                force: HashSet::from_iter(vec!["rm".into()]),
+                override_path: HashSet::from_iter(vec!["rm".into()]),
             },
             ..Default::default()
         };
@@ -464,7 +464,7 @@ mod tests {
             write: WriteTool {
                 allow: "ls".into(),
                 deny: "rm".into(),
-                force: HashSet::from_iter(vec!["rm".into()]),
+                override_path: HashSet::from_iter(vec!["rm".into()]),
             },
             ..Default::default()
         };

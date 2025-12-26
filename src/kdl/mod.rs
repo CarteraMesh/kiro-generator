@@ -86,13 +86,13 @@ mod tests {
                    write {
                        allow "./src/*" "./scripts/**"
                        deny  "Cargo.lock"
-                       force "/tmp"
-                       force "/var/log"
+                       override "/tmp"
+                       override "/var/log"
                    }
                    shell deny-by-default=true {
                       allow "git status .*"
                       deny "git push .*"
-                      force "git pull .*"
+                      override "git pull .*"
                    }
                 }
             }
@@ -228,13 +228,13 @@ mod tests {
                write {
                    allow "./src/*" "./scripts/**"
                    deny  "Cargo.lock"
-                   force "/tmp"
-                   force "/var/log"
+                   override "/tmp"
+                   override "/var/log"
                }
                shell deny-by-default=true {
                   allow "git status .*"
                   deny "git push .*"
-                  force "git pull .*"
+                  override "git pull .*"
                }
             }
             "#;

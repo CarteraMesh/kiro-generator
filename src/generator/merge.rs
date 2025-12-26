@@ -124,14 +124,14 @@ mod tests {
 
         // Should have force permissions from dependabot overriding denies from base
         let shell = dependabot.get_tool_shell();
-        assert!(shell.force.contains(&"git commit .*".into()));
-        assert!(shell.force.contains(&"git push .*".into()));
+        assert!(shell.override_command.contains(&"git commit .*".into()));
+        assert!(shell.override_command.contains(&"git push .*".into()));
 
         let read = dependabot.get_tool_read();
-        assert!(read.force.contains(&".*Cargo.toml.*".into()));
+        assert!(read.override_path.contains(&".*Cargo.toml.*".into()));
 
         let write = dependabot.get_tool_write();
-        assert!(write.force.contains(&".*Cargo.toml.*".into()));
+        assert!(write.override_path.contains(&".*Cargo.toml.*".into()));
 
         // Should have aws tool from aws-test
         let aws = dependabot.get_tool_aws();
