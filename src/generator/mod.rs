@@ -108,7 +108,7 @@ impl Generator {
         })
     }
 
-    /// Check if an agent is defined in local kg.toml
+    /// Check if an agent is defined in local kg.kdl
     pub fn is_local(&self, agent_name: impl AsRef<str>) -> bool {
         self.resolved.sources.is_local(agent_name)
     }

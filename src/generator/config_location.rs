@@ -50,7 +50,7 @@ impl ConfigLocation {
 
         if !global_exists && !local_exists {
             return Err(eyre!(
-                "no kg.toml found at global ({}) or local ({})",
+                "no kg.kdl found at global ({}) or local ({})",
                 self.global_kg().display(),
                 self.local_kg().display()
             ));

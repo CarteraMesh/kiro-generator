@@ -79,10 +79,10 @@ impl Display for ResolvedAgents {
 ///
 /// merge agent config from lowest precedence to higher precedence:
 /// ```text
-/// * `~/.kiro/generators/<agent-name>.toml`
-/// * `~/.kiro/generators/kg.toml`
-/// * `.kiro/generators/<agent-name>.toml`
-/// * `.kiro/generators/kg.toml`
+/// * `~/.kiro/generators/<agent-name>.kdl`
+/// * `~/.kiro/generators/kg.kdl`
+/// * `.kiro/generators/<agent-name>.kdl`
+/// * `.kiro/generators/kg.kdl`
 /// ```
 #[tracing::instrument(level = "info")]
 pub fn discover(
