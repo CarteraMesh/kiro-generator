@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
     match cli.command {
         commands::Command::Validate(args) | commands::Command::Generate(args) => {
             let results = q_generator_config.write_all(dry_run).await?;
-            format.result(dry_run, args.show_skeletons, results)?;
+            format.result(dry_run, args.show_templates, results)?;
         }
         _ => {}
     };

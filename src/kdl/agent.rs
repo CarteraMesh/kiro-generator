@@ -68,7 +68,7 @@ pub struct KdlAgent {
     pub name: String,
     /// Do not generate JSON Kiro agent, this is a "template" agent
     #[knuffel(property, default)]
-    pub skeleton: Option<bool>,
+    pub template: Option<bool>,
     #[knuffel(child, unwrap(argument))]
     pub description: Option<String>,
     #[knuffel(child, default)]
@@ -127,8 +127,8 @@ impl KdlAgent {
         }
     }
 
-    pub fn is_skeleton(&self) -> bool {
-        self.skeleton.is_some_and(|f| f)
+    pub fn is_template(&self) -> bool {
+        self.template.is_some_and(|f| f)
     }
 
     pub fn include_mcp_json(&self) -> bool {

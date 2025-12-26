@@ -28,8 +28,8 @@ pub struct AgentResult {
 }
 
 impl AgentResult {
-    pub fn is_skeleton(&self) -> bool {
-        self.agent.is_skeleton()
+    pub fn is_template(&self) -> bool {
+        self.agent.is_template()
     }
 
     pub fn forced(&self, target: &ToolTarget) -> Vec<String> {
@@ -143,7 +143,7 @@ impl Generator {
         let destination = self.destination_dir(&agent.name);
         let result = AgentResult {
             kiro_agent: Agent::from(&agent),
-            writable: !agent.is_skeleton(),
+            writable: !agent.is_template(),
             destination,
             agent,
         };

@@ -109,8 +109,8 @@ impl OutputFormat {
     fn agent_result_to_row(&self, result: &AgentResult) -> Row {
         let mut row = Row::new();
 
-        // Agent name with skeleton indicator
-        let name_cell = if result.is_skeleton() {
+        // Agent name with template indicator
+        let name_cell = if result.is_template() {
             Cell::new(format!("{} {}", result.agent.name, "💀"))
         } else {
             Cell::new(&result.agent.name)
@@ -118,7 +118,7 @@ impl OutputFormat {
         row.add_cell(name_cell);
 
         // Location: 🏠 for global, 📁 for local
-        let location = if result.is_skeleton() {
+        let location = if result.is_template() {
             Cell::new("")
         } else if result.destination.is_absolute() {
             Cell::new("🏠")
@@ -217,7 +217,7 @@ impl OutputFormat {
     pub fn result(
         &self,
         dry_run: bool,
-        show_skeletons: bool,
+        show_templates: bool,
         results: Vec<AgentResult>,
     ) -> Result<()> {
         match self {
@@ -269,7 +269,7 @@ impl OutputFormat {
                 }
 
                 for result in &results {
-                    if show_skeletons || !result.is_skeleton() {
+                    if show_templates || !result.is_template() {
                         table.add_row(self.agent_result_to_row(result));
                     }
                 }

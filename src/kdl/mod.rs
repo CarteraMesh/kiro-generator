@@ -109,7 +109,7 @@ mod tests {
         let agent = config.agents[0].clone();
         assert_eq!(agent.name, "test");
         assert!(agent.model.is_none());
-        assert!(!agent.is_skeleton());
+        assert!(!agent.is_template());
         let inherits = agent.inherits();
         assert_eq!(inherits.len(), 1);
         assert_eq!(inherits.iter().next().unwrap(), "parent");
@@ -158,7 +158,7 @@ mod tests {
     #[test_log::test]
     fn test_agent_empty() -> crate::Result<()> {
         let kdl_agents = r#"
-            agent "test" skeleton=true {
+            agent "test" template=true {
             }
         "#;
 
@@ -173,7 +173,7 @@ mod tests {
         let agent = config.agents[0].clone();
         assert_eq!(agent.name, "test");
         assert!(agent.model.is_none());
-        assert!(agent.is_skeleton());
+        assert!(agent.is_template());
         Ok(())
     }
 

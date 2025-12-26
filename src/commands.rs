@@ -45,9 +45,9 @@ pub struct Args {
     #[arg(short = 'g', long, conflicts_with = "local")]
     /// Ignore local .kiro/generators/kg.toml config agent definitions
     pub global: bool,
-    /// Show skeleton agents in output
+    /// Show template agents in output
     #[arg(long, default_value = "false")]
-    pub show_skeletons: bool,
+    pub show_templates: bool,
 }
 
 #[derive(Subcommand, Clone)]

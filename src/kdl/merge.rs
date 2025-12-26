@@ -4,7 +4,7 @@ impl KdlAgent {
     pub fn merge(mut self, other: KdlAgent) -> Self {
         // Child wins for explicit values
         self.include_mcp_json = self.include_mcp_json.or(other.include_mcp_json);
-        self.skeleton = self.skeleton.or(other.skeleton);
+        self.template = self.template.or(other.template);
         self.description = self.description.or(other.description);
         self.prompt = self.prompt.or(other.prompt);
         self.model = self.model.or(other.model);
@@ -41,7 +41,7 @@ mod tests {
     #[test_log::test]
     fn test_agent_merge() -> crate::Result<()> {
         let kdl_agents = r#"
-            agent "child" skeleton=false {
+            agent "child" template=false {
                description "I am a child"
                resource "file://child.md"
                resource "file://README.md"
@@ -65,7 +65,7 @@ mod tests {
                }
                 alias "execute_bash" "shell"
             }
-            agent "parent" skeleton=true {
+            agent "parent" template=true {
                description "I am parent"
                resource "file://parent.md"
                resource "file://README.md"
@@ -138,7 +138,7 @@ mod tests {
         assert_eq!(d, "I am a child");
 
         assert_eq!(merged.resources.len(), 3);
-        assert!(!merged.is_skeleton());
+        assert!(!merged.is_template());
         assert!(merged.include_mcp_json());
 
         assert_eq!(merged.inherits.parents.len(), 1);

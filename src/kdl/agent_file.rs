@@ -58,7 +58,7 @@ impl KdlAgent {
         Self {
             name: name.as_ref().to_string(),
             description: file_source.description,
-            skeleton: None,
+            template: None,
             inherits: Inherits::default(),
             prompt: file_source.prompt,
             resources: file_source.resources,
