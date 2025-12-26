@@ -18,11 +18,11 @@ impl Generator {
         visited.insert(agent.name.clone());
 
         let mut chain = Vec::new();
-        for parent_name in agent.inherits() {
+        for parent_name in agent.inherits().iter() {
             let parent = self
                 .resolved
                 .agents
-                .get(&parent_name)
+                .get(parent_name)
                 .ok_or_else(|| color_eyre::eyre::eyre!("Agent '{parent_name}' not found"))?;
 
             let parent_chain = self.resolve_transitive_inheritance(parent, visited)?;
@@ -31,8 +31,8 @@ impl Generator {
                     chain.push(p);
                 }
             }
-            if !chain.contains(&parent_name) {
-                chain.push(parent_name);
+            if !chain.contains(parent_name) {
+                chain.push(parent_name.clone());
             }
         }
 
@@ -113,7 +113,7 @@ mod tests {
         assert!(allowed.contains("@awsdocs"));
 
         // Should have resources from all three
-        let resources = dependabot.resources();
+        let resources: Vec<String> = dependabot.resources().map(|s| s.to_string()).collect();
         assert!(resources.contains(&"file://README.md".to_string()));
         assert!(resources.contains(&"file://AGENTS.md".to_string()));
         assert!(resources.contains(&"file://.amazonq/rules/**/*.md".to_string()));

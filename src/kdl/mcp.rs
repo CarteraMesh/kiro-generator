@@ -97,3 +97,9 @@ impl From<CustomToolConfigKdl> for CustomToolConfig {
         }
     }
 }
+
+impl From<&CustomToolConfigKdl> for CustomToolConfig {
+    fn from(value: &CustomToolConfigKdl) -> Self {
+        value.clone().into()
+    }
+}

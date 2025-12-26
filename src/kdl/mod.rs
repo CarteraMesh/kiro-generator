@@ -16,7 +16,7 @@ pub struct GeneratorConfig {
 
 impl GeneratorConfig {
     pub fn names(&self) -> HashSet<String> {
-        HashSet::from_iter(self.agents.clone().into_iter().map(|a| a.name))
+        self.agents.iter().map(|a| a.name.clone()).collect()
     }
 
     pub fn get(&self, name: impl AsRef<str>) -> Option<&KdlAgent> {
@@ -119,7 +119,7 @@ mod tests {
         let tools = agent.tools();
         assert_eq!(tools.len(), 1);
         assert_eq!(tools.iter().next().unwrap(), "*");
-        let resources = agent.resources();
+        let resources: Vec<String> = agent.resources().map(|s| s.to_string()).collect();
         assert_eq!(resources.len(), 2);
         assert!(resources.contains(&"file://resource.md".to_string()));
         assert!(resources.contains(&"file://README.md".to_string()));

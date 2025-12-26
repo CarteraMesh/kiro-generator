@@ -214,9 +214,8 @@ impl HookPart {
                     hooks.insert(
                         t,
                         self.agent_spawn
-                            .clone()
-                            .into_iter()
-                            .map(Hook::from)
+                            .iter()
+                            .map(|h| Hook::from(h.clone()))
                             .collect(),
                     );
                 }
@@ -224,9 +223,8 @@ impl HookPart {
                     hooks.insert(
                         t,
                         self.user_prompt_submit
-                            .clone()
-                            .into_iter()
-                            .map(Hook::from)
+                            .iter()
+                            .map(|h| Hook::from(h.clone()))
                             .collect(),
                     );
                 }
@@ -234,9 +232,8 @@ impl HookPart {
                     hooks.insert(
                         t,
                         self.pre_tool_use
-                            .clone()
-                            .into_iter()
-                            .map(Hook::from)
+                            .iter()
+                            .map(|h| Hook::from(h.clone()))
                             .collect(),
                     );
                 }
@@ -244,14 +241,13 @@ impl HookPart {
                     hooks.insert(
                         t,
                         self.post_tool_use
-                            .clone()
-                            .into_iter()
-                            .map(Hook::from)
+                            .iter()
+                            .map(|h| Hook::from(h.clone()))
                             .collect(),
                     );
                 }
                 HookTrigger::Stop => {
-                    hooks.insert(t, self.stop.clone().into_iter().map(Hook::from).collect());
+                    hooks.insert(t, self.stop.iter().map(|h| Hook::from(h.clone())).collect());
                 }
             };
         }

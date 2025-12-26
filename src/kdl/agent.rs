@@ -153,8 +153,7 @@ impl KdlAgent {
 
     pub fn tool_aliases(&self) -> HashMap<OriginalToolName, String> {
         self.tool_aliases
-            .clone()
-            .into_iter()
+            .iter()
             .map(|m| (OriginalToolName(m.from.clone()), m.to.clone()))
             .collect()
     }
@@ -166,30 +165,25 @@ impl KdlAgent {
         }
     }
 
-    pub fn allowed_tools(&self) -> HashSet<String> {
-        self.allowed_tools.allowed.clone()
+    pub fn allowed_tools(&self) -> &HashSet<String> {
+        &self.allowed_tools.allowed
     }
 
-    pub fn tools(&self) -> HashSet<String> {
-        self.tools.tools.clone()
+    pub fn tools(&self) -> &HashSet<String> {
+        &self.tools.tools
     }
 
-    pub fn inherits(&self) -> HashSet<String> {
-        self.inherits.parents.clone()
+    pub fn inherits(&self) -> &HashSet<String> {
+        &self.inherits.parents
     }
 
-    pub fn resources(&self) -> Vec<String> {
-        self.resources
-            .clone()
-            .into_iter()
-            .map(|r| r.location)
-            .collect()
+    pub fn resources(&self) -> impl Iterator<Item = &str> {
+        self.resources.iter().map(|r| r.location.as_str())
     }
 
     pub fn mcp_servers(&self) -> HashMap<String, CustomToolConfig> {
         self.mcp
-            .clone()
-            .into_iter()
+            .iter()
             .map(|m| (m.name.clone(), m.into()))
             .collect()
     }

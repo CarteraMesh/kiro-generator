@@ -63,7 +63,7 @@ impl AgentResult {
     }
 
     pub fn resources(&self) -> Vec<String> {
-        self.agent.resources()
+        self.agent.resources().map(|s| s.to_string()).collect()
     }
 }
 

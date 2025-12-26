@@ -122,10 +122,10 @@ impl From<&KdlAgent> for Agent {
             mcp_servers: McpServerConfig {
                 mcp_servers: value.mcp_servers(),
             },
-            tools: value.tools(),
+            tools: value.tools().clone(),
             tool_aliases: value.tool_aliases(),
-            allowed_tools: value.allowed_tools(),
-            resources: value.resources().into_iter().collect(),
+            allowed_tools: value.allowed_tools().clone(),
+            resources: value.resources().map(|s| s.to_string()).collect(),
             hooks: value.hooks(),
             tools_settings,
             model: value.model.clone(),
