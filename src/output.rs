@@ -1,13 +1,12 @@
 use {
     crate::{
         Result,
-        agent::{Agent, KgAgent, ToolTarget},
+        agent::{Agent, ToolTarget},
         generator::AgentResult,
-        os::Fs,
-        source::AgentSource,
+        source::KdlSources,
     },
     colored::Colorize,
-    std::{collections::HashMap, fmt::Display},
+    std::fmt::Display,
     super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
     tracing::enabled,
 };
@@ -78,17 +77,12 @@ fn serialize_yaml(label: &str, values: &[String]) -> Option<Cell> {
 }
 
 impl OutputFormat {
-    pub fn trace_agent(&self, agent: &KgAgent) -> Result<()> {
-        eprintln!("{}", serde_json::to_string_pretty(agent)?);
-        Ok(())
-    }
-
-    pub fn sources(&self, fs: &Fs, sources: &HashMap<String, Vec<AgentSource>>) -> Result<()> {
+    pub fn sources(&self, sources: &KdlSources) -> Result<()> {
         if !enabled!(tracing::Level::DEBUG) {
             return Ok(());
         }
         match self {
-            Self::Table(color) => {
+            Self::Table(_color) => {
                 let mut table = Table::new();
                 table
                     .load_preset(UTF8_FULL)
@@ -102,7 +96,7 @@ impl OutputFormat {
                     ]);
                 for (name, agent_sources) in sources.iter() {
                     let mut row: Vec<Cell> = vec![Cell::new(name.to_string())];
-                    row.extend(agent_sources.iter().map(|s| s.to_cell(*color, fs)));
+                    row.extend(agent_sources.iter().map(|s| s.into()));
                     table.add_row(row);
                 }
                 eprintln!("{table}");
@@ -115,8 +109,8 @@ impl OutputFormat {
     fn agent_result_to_row(&self, result: &AgentResult) -> Row {
         let mut row = Row::new();
 
-        // Agent name with skeleton indicator
-        let name_cell = if result.agent.skeleton() {
+        // Agent name with template indicator
+        let name_cell = if result.is_template() {
             Cell::new(format!("{} {}", result.agent.name, "💀"))
         } else {
             Cell::new(&result.agent.name)
@@ -124,7 +118,7 @@ impl OutputFormat {
         row.add_cell(name_cell);
 
         // Location: 🏠 for global, 📁 for local
-        let location = if result.agent.skeleton() {
+        let location = if result.is_template() {
             Cell::new("")
         } else if result.destination.is_absolute() {
             Cell::new("🏠")
@@ -135,7 +129,7 @@ impl OutputFormat {
 
         // MCP servers (only enabled ones)
         let mut servers = Vec::new();
-        for (k, v) in &result.agent.mcp_servers.mcp_servers {
+        for (k, v) in &result.agent.mcp_servers() {
             if !v.disabled {
                 servers.push(k.clone());
             }
@@ -146,20 +140,20 @@ impl OutputFormat {
         // Allowed tools
         let mut allowed_tools: Vec<String> = result
             .agent
-            .allowed_tools
-            .0
+            .allowed_tools()
             .iter()
             .filter(|t| !t.is_empty())
             .cloned()
             .collect();
         allowed_tools.sort();
         let mut enabled_tools = Vec::with_capacity(allowed_tools.len());
+        let mcps = result.agent.mcp_servers();
         for t in allowed_tools {
             if t.len() < 2 {
                 continue;
             }
             if let Some(server_name) = t.strip_prefix("@") {
-                match result.agent.mcp_servers.mcp_servers.get(server_name) {
+                match mcps.get(server_name) {
                     Some(mcp) if !mcp.disabled => {} // enabled, keep it
                     _ => continue,                   // disabled or doesn't exist, skip it
                 }
@@ -168,10 +162,10 @@ impl OutputFormat {
         }
         row.add_cell(Cell::new(enabled_tools.join(", ")));
 
-        // Forced permissions (security-critical)
-        let sh = result.forced(&ToolTarget::Shell);
-        let read = result.forced(&ToolTarget::Read);
-        let write = result.forced(&ToolTarget::Write);
+        // Override permissions (security-critical)
+        let sh = result.overrides(&ToolTarget::Shell);
+        let read = result.overrides(&ToolTarget::Read);
+        let write = result.overrides(&ToolTarget::Write);
 
         let mut forced = vec![];
         if let Some(c) = serialize_yaml("cmds:\n", &sh) {
@@ -223,7 +217,7 @@ impl OutputFormat {
     pub fn result(
         &self,
         dry_run: bool,
-        show_skeletons: bool,
+        show_templates: bool,
         results: Vec<AgentResult>,
     ) -> Result<()> {
         match self {
@@ -255,7 +249,7 @@ impl OutputFormat {
                             Color::Yellow,
                         ),
                         self.maybe_color(
-                            Cell::new("Forced Permissions")
+                            Cell::new("Override (Allowed) Permissions")
                                 .set_colspan(3)
                                 .set_alignment(CellAlignment::Center),
                             Color::Yellow,
@@ -268,14 +262,14 @@ impl OutputFormat {
                         Cell::new(format!("MCP {}", emojis_rs::EMOJI_COMPUTER)),
                         Cell::new(format!("Allowed Tools {}", emojis_rs::EMOJI_GEAR)),
                         Cell::new(format!("Resources {}", emojis_rs::EMOJI_DOCUMENT)),
-                        Cell::new("Forced Permissions")
+                        Cell::new("Override (Allowed) Permissions")
                             .set_colspan(3)
                             .set_alignment(CellAlignment::Center),
                     ]);
                 }
 
                 for result in &results {
-                    if show_skeletons || !result.agent.skeleton() {
+                    if show_templates || !result.is_template() {
                         table.add_row(self.agent_result_to_row(result));
                     }
                 }

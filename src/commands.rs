@@ -40,14 +40,14 @@ pub struct Cli {
 #[derive(clap::Args, Clone, Default)]
 pub struct Args {
     #[arg(long, conflicts_with = "global")]
-    /// Ignore global $HOME kg.toml and all global agent definitions
+    /// Ignore global $HOME kg.kdl and all global agent definitions
     pub local: bool,
     #[arg(short = 'g', long, conflicts_with = "local")]
-    /// Ignore local .kiro/generators/kg.toml config agent definitions
+    /// Ignore local .kiro/generators/kg.kdl config agent definitions
     pub global: bool,
-    /// Show skeleton agents in output
+    /// Show template agents in output
     #[arg(long, default_value = "false")]
-    pub show_skeletons: bool,
+    pub show_templates: bool,
 }
 
 #[derive(Subcommand, Clone)]
@@ -112,10 +112,10 @@ impl Cli {
         }
     }
 
-    /// Return home dir and ~/.kiro/generators/kg.toml
+    /// Return home dir and ~/.kiro/generators/kg.kdl
     pub fn config(&self) -> crate::Result<(PathBuf, PathBuf)> {
         let home_dir = dirs::home_dir().ok_or(eyre!("cannot locate home directory"))?;
-        let cfg = home_dir.join(".kiro").join("generators").join("kg.toml");
+        let cfg = home_dir.join(".kiro").join("generators").join("kg.kdl");
         Ok((home_dir, cfg))
     }
 }

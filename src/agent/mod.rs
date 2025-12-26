@@ -1,6 +1,5 @@
 mod custom_tool;
 pub mod hook;
-mod kg_agent;
 mod mcp_config;
 pub mod tools;
 mod wrapper_types;
@@ -8,7 +7,7 @@ pub const DEFAULT_AGENT_RESOURCES: &[&str] = &["file://README.md", "file://AGENT
 pub const DEFAULT_APPROVE: [&str; 0] = [];
 use {
     super::agent::hook::{Hook, HookTrigger},
-    crate::Result,
+    crate::{Result, kdl::KdlAgent},
     color_eyre::eyre::eyre,
     serde::{Deserialize, Serialize},
     std::{
@@ -17,7 +16,7 @@ use {
     },
 };
 pub use {
-    kg_agent::KgAgent,
+    custom_tool::{CustomToolConfig, OAuthConfig, TransportType, tool_default_timeout},
     mcp_config::McpServerConfig,
     tools::*,
     wrapper_types::OriginalToolName,
@@ -78,23 +77,6 @@ impl Display for Agent {
 }
 
 impl Agent {
-    #[cfg(test)]
-    pub(crate) fn get_tool<T: serde::de::DeserializeOwned + Default>(&self, tool: ToolTarget) -> T {
-        match self.tools_settings.get(&tool) {
-            Some(value) => match serde_json::from_value(value.clone()) {
-                Ok(settings) => settings,
-                Err(e) => {
-                    tracing::debug!("Failed to deserialize tool settings for {tool}: {e}");
-                    T::default()
-                }
-            },
-            None => {
-                tracing::debug!("No tool settings found for {tool}");
-                T::default()
-            }
-        }
-    }
-
     pub fn validate(&self) -> Result<()> {
         let schema: serde_json::Value = serde_json::from_str(crate::schema::SCHEMA)?;
         let validator = jsonschema::validator_for(&schema)?;
@@ -108,6 +90,63 @@ impl Agent {
             ));
         }
         Ok(())
+    }
+}
+
+impl From<&KdlAgent> for Agent {
+    fn from(value: &KdlAgent) -> Self {
+        let native_tools = &value.native_tool;
+        let mut tools_settings = HashMap::new();
+
+        let tool: AwsTool = native_tools.into();
+        if tool != AwsTool::default() {
+            tools_settings.insert(ToolTarget::Aws, serde_json::to_value(&tool).unwrap());
+        }
+        let tool: ReadTool = native_tools.into();
+        if tool != ReadTool::default() {
+            tools_settings.insert(ToolTarget::Read, serde_json::to_value(&tool).unwrap());
+        }
+        let tool: WriteTool = native_tools.into();
+        if tool != WriteTool::default() {
+            tools_settings.insert(ToolTarget::Write, serde_json::to_value(&tool).unwrap());
+        }
+        let tool: ExecuteShellTool = native_tools.into();
+        if tool != ExecuteShellTool::default() {
+            tools_settings.insert(ToolTarget::Shell, serde_json::to_value(&tool).unwrap());
+        }
+        let default_agent = Self::default();
+        let tools = value.tools().clone();
+        let allowed_tools = value.allowed_tools().clone();
+        let resources: HashSet<String> = value.resources().map(|s| s.to_string()).collect();
+
+        Self {
+            name: value.name.clone(),
+            description: value.description.clone(),
+            prompt: value.prompt.clone(),
+            mcp_servers: McpServerConfig {
+                mcp_servers: value.mcp_servers(),
+            },
+            tools: if tools.is_empty() {
+                default_agent.tools
+            } else {
+                tools
+            },
+            tool_aliases: value.tool_aliases(),
+            allowed_tools: if allowed_tools.is_empty() {
+                default_agent.allowed_tools
+            } else {
+                allowed_tools
+            },
+            resources: if resources.is_empty() {
+                default_agent.resources
+            } else {
+                resources
+            },
+            hooks: value.hooks(),
+            tools_settings,
+            model: value.model.clone(),
+            include_mcp_json: value.include_mcp_json(),
+        }
     }
 }
 

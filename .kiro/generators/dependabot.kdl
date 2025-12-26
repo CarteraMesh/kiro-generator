@@ -1,0 +1,8 @@
+description "I make life painful for developers"
+
+native-tool {
+  shell  { override "git commit .*"; override "git push .*"; }
+  read   { override ".*Cargo.toml.*"; }
+  write  { override ".*Cargo.toml.*"; }
+  aws disable-auto-readonly=true
+}

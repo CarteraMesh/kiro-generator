@@ -1,14 +1,11 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Agent",
   "description": "An Agent is a declarative way of configuring a given instance of kiro-cli.",
   "type": "object",
   "properties": {
     "$schema": {
-      "type": [
-        "string",
-        "null"
-      ]
+      "type": ["string", "null"]
     },
     "name": {
       "description": "Name of the agent",
@@ -16,18 +13,12 @@
     },
     "description": {
       "description": "This field is not model facing and is mostly here for users to discern between agents",
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "default": null
     },
     "prompt": {
       "description": "The intention for this field is to provide high level context to the\nagent. This should be seen as the same category of context as a system prompt.",
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "default": null
     },
     "mcpServers": {
@@ -107,27 +98,19 @@
     },
     "model": {
       "description": "The model ID to use for this agent. If not specified, uses the default model.",
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "default": null
     }
   },
   "additionalProperties": false,
-  "required": [
-    "name"
-  ],
+  "required": ["name"],
   "$defs": {
     "CustomToolConfig": {
       "type": "object",
       "properties": {
         "type": {
           "description": "Transport type: \"stdio\", \"http\", or \"registry\"",
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "url": {
           "description": "The URL for HTTP-based MCP server communication",
@@ -171,10 +154,7 @@
         },
         "env": {
           "description": "A list of environment variables to run the command with",
-          "type": [
-            "object",
-            "null"
-          ],
+          "type": ["object", "null"],
           "additionalProperties": {
             "type": "string"
           }
@@ -203,17 +183,11 @@
       "properties": {
         "redirectUri": {
           "description": "Custom redirect URI for OAuth flow (e.g., \"127.0.0.1:7778\")\nIf not specified, a random available port will be assigned by the OS",
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "oauthScopes": {
           "description": "Scopes with which oauth is done (new location, preferred over root-level oauth_scopes)",
-          "type": [
-            "array",
-            "null"
-          ],
+          "type": ["array", "null"],
           "items": {
             "type": "string"
           }
@@ -245,16 +219,10 @@
               "pattern": "^(file://)"
             },
             "name": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": ["string", "null"]
             },
             "description": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": ["string", "null"]
             },
             "indexType": {
               "anyOf": [
@@ -267,47 +235,32 @@
               ]
             },
             "include": {
-              "type": [
-                "array",
-                "null"
-              ],
+              "type": ["array", "null"],
               "items": {
                 "type": "string"
               }
             },
             "exclude": {
-              "type": [
-                "array",
-                "null"
-              ],
+              "type": ["array", "null"],
               "items": {
                 "type": "string"
               }
             },
             "autoUpdate": {
-              "type": [
-                "boolean",
-                "null"
-              ]
+              "type": ["boolean", "null"]
             },
             "type": {
               "type": "string",
               "const": "knowledgeBase"
             }
           },
-          "required": [
-            "type",
-            "source"
-          ]
+          "required": ["type", "source"]
         }
       ]
     },
     "IndexType": {
       "type": "string",
-      "enum": [
-        "fast",
-        "best"
-      ]
+      "enum": ["fast", "best"]
     },
     "Hook": {
       "type": "object",
@@ -339,15 +292,10 @@
         },
         "matcher": {
           "description": "Optional glob matcher for hook\nCurrently used for matching tool name of PreToolUse and PostToolUse hook",
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         }
       },
-      "required": [
-        "command"
-      ]
+      "required": ["command"]
     },
     "ToolSettingTarget": {
       "description": "The name of the tool to be configured",

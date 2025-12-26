@@ -7,7 +7,9 @@ const DEFAULT_TIMEOUT_MS: u64 = 30_000;
 const DEFAULT_MAX_OUTPUT_SIZE: usize = 1024 * 10;
 const DEFAULT_CACHE_TTL_SECONDS: u64 = 0;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Hash, enum_iterator::Sequence,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum HookTrigger {
     /// Triggered during agent spawn
@@ -34,13 +36,6 @@ impl Display for HookTrigger {
     }
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Eq, PartialEq, Hash)]
-pub enum Source {
-    #[default]
-    Agent,
-    Session,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Hook {
     /// The command to run when the hook is triggered
@@ -62,9 +57,6 @@ pub struct Hook {
     /// Currently used for matching tool name of PreToolUse and PostToolUse hook
     #[serde(skip_serializing_if = "Option::is_none")]
     pub matcher: Option<String>,
-
-    #[serde(default, skip_serializing)]
-    pub source: Source,
 }
 
 impl Hook {

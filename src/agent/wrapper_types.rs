@@ -6,7 +6,7 @@ use {
 /// Subject of the tool name change. For tools in mcp servers, you would need to
 /// prefix them with their server names
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]
-pub struct OriginalToolName(String);
+pub struct OriginalToolName(pub String);
 
 impl Deref for OriginalToolName {
     type Target = String;

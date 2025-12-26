@@ -122,6 +122,12 @@ impl Fs {
                     fs.create_dir_all(ACTIVE_USER_HOME)
                         .await
                         .expect("failed to create test user home");
+                    let user_path = PathBuf::from(ACTIVE_USER_HOME)
+                        .join(".kiro")
+                        .join("generators");
+                    fs.create_dir_all(&user_path)
+                        .await
+                        .expect("failed to create test user home");
                     fs.create_dir_all("./.kiro").await.ok();
                     fs.create_dir_all("./.kiro/generators").await.ok();
                     fs.create_dir_all("./.kiro/agents").await.ok();
@@ -135,6 +141,17 @@ impl Fs {
                                 fs.write(format!("./.kiro/generators/{}", name), config)
                                     .await
                                     .ok();
+                            }
+                        }
+                    }
+                    if let Ok(entries) = std::fs::read_dir("./.kiro/global") {
+                        for entry in entries.flatten() {
+                            if let Ok(file_type) = entry.file_type()
+                                && file_type.is_file()
+                                && let Ok(config) = std::fs::read_to_string(entry.path())
+                                && let Some(name) = entry.file_name().to_str()
+                            {
+                                fs.write(user_path.join(name), config).await.ok();
                             }
                         }
                     }
@@ -565,179 +582,190 @@ impl Default for Fs {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     #[tokio::test]
-//     async fn test_fake() {
-//         let dir = PathBuf::from("/dir");
-//         let fs = Fs::from_slice(&[("/test", "test")]);
+    #[tokio::test]
+    async fn test_fake() {
+        let dir = PathBuf::from("/dir");
+        let fs = Fs::from_slice(&[("/test", "test")]);
 
-//         fs.create_dir(dir.join("create_dir")).await.unwrap_err();
-//         fs.create_dir_all(dir.join("create/dir/all")).await.unwrap_err();
-//         fs.write(dir.join("write"), b"write").await.unwrap();
-//         assert_eq!(fs.read(dir.join("write")).await.unwrap(), b"write");
-//         assert_eq!(fs.read_to_string(dir.join("write")).await.unwrap(),
-// "write");     }
+        fs.create_dir(dir.join("create_dir")).await.unwrap_err();
+        fs.create_dir_all(dir.join("create/dir/all"))
+            .await
+            .unwrap_err();
+        fs.write(dir.join("write"), b"write").await.unwrap();
+        assert_eq!(fs.read(dir.join("write")).await.unwrap(), b"write");
+        assert_eq!(fs.read_to_string(dir.join("write")).await.unwrap(), "write");
+    }
 
-//     #[tokio::test]
-//     async fn test_real() {
-//         let dir = tempfile::tempdir().unwrap();
-//         let fs = Fs::Real;
+    #[tokio::test]
+    async fn test_real() {
+        let dir = tempfile::tempdir().unwrap();
+        let fs = Fs::Real;
 
-//         fs.create_dir(dir.path().join("create_dir")).await.unwrap();
-//         fs.create_dir_all(dir.path().join("create/dir/all")).await.unwrap();
-//         fs.write(dir.path().join("write"), b"write").await.unwrap();
-//         assert_eq!(fs.read(dir.path().join("write")).await.unwrap(),
-// b"write");         assert_eq!(fs.read_to_string(dir.path().join("write")).
-// await.unwrap(), "write");     }
+        fs.create_dir(dir.path().join("create_dir")).await.unwrap();
+        fs.create_dir_all(dir.path().join("create/dir/all"))
+            .await
+            .unwrap();
+        fs.write(dir.path().join("write"), b"write").await.unwrap();
+        assert_eq!(fs.read(dir.path().join("write")).await.unwrap(), b"write");
+        assert_eq!(
+            fs.read_to_string(dir.path().join("write")).await.unwrap(),
+            "write"
+        );
+    }
 
-//     macro_rules! test_append_cases {
-//     ($(
-//         $name:ident: ($a:expr, $b:expr) => $expected:expr
-//     ),* $(,)?) => {
-//         $(
-//             #[test]
-//             fn $name() {
-//                 assert_eq!(append($a, $b), normalize_test_path($expected));
-//             }
-//         )*
-//     };
-// }
+    macro_rules! test_append_cases {
+    ($(
+        $name:ident: ($a:expr, $b:expr) => $expected:expr
+    ),* $(,)?) => {
+        $(
+            #[test]
+            fn $name() {
+                assert_eq!(append($a, $b), normalize_test_path($expected));
+            }
+        )*
+    };
+}
 
-//     test_append_cases!(
-//         append_test_path_to_dir: ("/abc/test", "/test") => "/abc/test/test",
-//         append_absolute_to_tmp_dir: ("/tmp/.dir", "/tmp/.dir/home/myuser") =>
-// "/tmp/.dir/home/myuser",         append_different_tmp_path: ("/tmp/.dir",
-// "/tmp/hello") => "/tmp/.dir/tmp/hello",         append_nested_path_to_tmpdir:
-// ("/tmp/.dir", "/tmp/.dir/tmp/.dir/home/user") => "/tmp/.dir/home/user",
-//     );
+    test_append_cases!(
+            append_test_path_to_dir: ("/abc/test", "/test") => "/abc/test/test",
+            append_absolute_to_tmp_dir: ("/tmp/.dir", "/tmp/.dir/home/myuser") =>
+    "/tmp/.dir/home/myuser",         append_different_tmp_path: ("/tmp/.dir",
+    "/tmp/hello") => "/tmp/.dir/tmp/hello",         append_nested_path_to_tmpdir:
+    ("/tmp/.dir", "/tmp/.dir/tmp/.dir/home/user") => "/tmp/.dir/home/user",
+        );
 
-//     #[tokio::test]
-//     async fn test_read_to_string() {
-//         let fs = Fs::new();
-//         fs.write("fake", "contents").await.unwrap();
-//         fs.write("invalid_utf8", &[255]).await.unwrap();
+    #[tokio::test]
+    async fn test_read_to_string() {
+        let fs = Fs::new();
+        fs.write("fake", "contents").await.unwrap();
+        fs.write("invalid_utf8", &[255]).await.unwrap();
 
-//         // async tests
-//         assert_eq!(
-//             fs.read_to_string("fake").await.unwrap(),
-//             "contents",
-//             "should read fake file"
-//         );
-//         assert!(
-//             fs.read_to_string("unknown")
-//                 .await
-//                 .is_err_and(|err| err.kind() == io::ErrorKind::NotFound),
-//             "unknown path should return NotFound"
-//         );
-//         assert!(
-//             fs.read_to_string("invalid_utf8")
-//                 .await
-//                 .is_err_and(|err| err.kind() == io::ErrorKind::InvalidData),
-//             "invalid utf8 should return InvalidData"
-//         );
+        // async tests
+        assert_eq!(
+            fs.read_to_string("fake").await.unwrap(),
+            "contents",
+            "should read fake file"
+        );
+        assert!(
+            fs.read_to_string("unknown")
+                .await
+                .is_err_and(|err| err.kind() == io::ErrorKind::NotFound),
+            "unknown path should return NotFound"
+        );
+        assert!(
+            fs.read_to_string("invalid_utf8")
+                .await
+                .is_err_and(|err| err.kind() == io::ErrorKind::InvalidData),
+            "invalid utf8 should return InvalidData"
+        );
 
-//         // sync tests
-//         assert_eq!(
-//             fs.read_to_string_sync("fake").unwrap(),
-//             "contents",
-//             "should read fake file"
-//         );
-//         assert!(
-//             fs.read_to_string_sync("unknown")
-//                 .is_err_and(|err| err.kind() == io::ErrorKind::NotFound),
-//             "unknown path should return NotFound"
-//         );
-//         assert!(
-//             fs.read_to_string_sync("invalid_utf8")
-//                 .is_err_and(|err| err.kind() == io::ErrorKind::InvalidData),
-//             "invalid utf8 should return InvalidData"
-//         );
-//     }
+        // sync tests
+        assert_eq!(
+            fs.read_to_string_sync("fake").unwrap(),
+            "contents",
+            "should read fake file"
+        );
+        assert!(
+            fs.read_to_string_sync("unknown")
+                .is_err_and(|err| err.kind() == io::ErrorKind::NotFound),
+            "unknown path should return NotFound"
+        );
+        assert!(
+            fs.read_to_string_sync("invalid_utf8")
+                .is_err_and(|err| err.kind() == io::ErrorKind::InvalidData),
+            "invalid utf8 should return InvalidData"
+        );
+    }
 
-//     #[tokio::test]
-//     #[cfg(unix)]
-//     async fn test_chroot_file_operations_for_unix() {
-//         if nix::unistd::Uid::effective().is_root() {
-//             println!("currently running as root, skipping.");
-//             return;
-//         }
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn test_chroot_file_operations_for_unix() {
+        if nix::unistd::Uid::effective().is_root() {
+            println!("currently running as root, skipping.");
+            return;
+        }
 
-//         let fs = Fs::new();
-//         assert!(fs.is_chroot());
+        let fs = Fs::new();
+        assert!(fs.is_chroot());
 
-//         fs.write("/fake", "contents").await.unwrap();
-//         assert_eq!(fs.read_to_string("/fake").await.unwrap(), "contents");
-//         assert_eq!(fs.read_to_string_sync("/fake").unwrap(), "contents");
+        fs.write("/fake", "contents").await.unwrap();
+        assert_eq!(fs.read_to_string("/fake").await.unwrap(), "contents");
+        assert_eq!(fs.read_to_string_sync("/fake").unwrap(), "contents");
 
-//         assert!(!fs.try_exists("/etc").await.unwrap());
+        assert!(!fs.try_exists("/etc").await.unwrap());
 
-//         fs.create_dir_all("/etc/b/c").await.unwrap();
-//         assert!(fs.try_exists("/etc").await.unwrap());
-//         let mut read_dir = fs.read_dir("/etc").await.unwrap();
-//         let e = read_dir.next_entry().await.unwrap();
-//         assert!(e.unwrap().metadata().await.unwrap().is_dir());
-//         assert!(read_dir.next_entry().await.unwrap().is_none());
+        fs.create_dir_all("/etc/b/c").await.unwrap();
+        assert!(fs.try_exists("/etc").await.unwrap());
+        let mut read_dir = fs.read_dir("/etc").await.unwrap();
+        let e = read_dir.next_entry().await.unwrap();
+        assert!(e.unwrap().metadata().await.unwrap().is_dir());
+        assert!(read_dir.next_entry().await.unwrap().is_none());
 
-//         fs.remove_dir_all("/etc").await.unwrap();
-//         assert!(!fs.try_exists("/etc").await.unwrap());
+        fs.remove_dir_all("/etc").await.unwrap();
+        assert!(!fs.try_exists("/etc").await.unwrap());
 
-//         fs.copy("/fake", "/fake_copy").await.unwrap();
-//         assert_eq!(fs.read_to_string("/fake_copy").await.unwrap(),
-// "contents");         assert_eq!(fs.read_to_string_sync("/fake_copy").
-// unwrap(), "contents");
+        fs.copy("/fake", "/fake_copy").await.unwrap();
+        assert_eq!(fs.read_to_string("/fake_copy").await.unwrap(), "contents");
+        assert_eq!(fs.read_to_string_sync("/fake_copy").unwrap(), "contents");
 
-//         fs.remove_file("/fake_copy").await.unwrap();
-//         assert!(!fs.try_exists("/fake_copy").await.unwrap());
+        fs.remove_file("/fake_copy").await.unwrap();
+        assert!(!fs.try_exists("/fake_copy").await.unwrap());
 
-//         fs.symlink("/fake", "/fake_symlink").await.unwrap();
-//         fs.symlink_sync("/fake", "/fake_symlink_sync").unwrap();
-//         assert_eq!(fs.read_to_string("/fake_symlink").await.unwrap(),
-// "contents");         assert_eq!(
-//             fs.read_to_string(fs.read_link("/fake_symlink").await.unwrap())
-//                 .await
-//                 .unwrap(),
-//             "contents"
-//         );
-//         assert_eq!(fs.read_to_string("/fake_symlink_sync").await.unwrap(),
-// "contents");         assert_eq!(fs.read_to_string_sync("/fake_symlink").
-// unwrap(), "contents");
+        fs.symlink("/fake", "/fake_symlink").await.unwrap();
+        fs.symlink_sync("/fake", "/fake_symlink_sync").unwrap();
+        assert_eq!(
+            fs.read_to_string("/fake_symlink").await.unwrap(),
+            "contents"
+        );
+        assert_eq!(
+            fs.read_to_string(fs.read_link("/fake_symlink").await.unwrap())
+                .await
+                .unwrap(),
+            "contents"
+        );
+        assert_eq!(
+            fs.read_to_string("/fake_symlink_sync").await.unwrap(),
+            "contents"
+        );
+        assert_eq!(fs.read_to_string_sync("/fake_symlink").unwrap(), "contents");
 
-//         // Checking symlink exist
-//         assert!(fs.symlink_exists("/fake_symlink").await);
-//         assert!(fs.exists("/fake_symlink"));
-//         fs.remove_file("/fake").await.unwrap();
-//         assert!(fs.symlink_exists("/fake_symlink").await);
-//         assert!(!fs.exists("/fake_symlink"));
+        // Checking symlink exist
+        assert!(fs.symlink_exists("/fake_symlink").await);
+        assert!(fs.exists("/fake_symlink"));
+        fs.remove_file("/fake").await.unwrap();
+        assert!(fs.symlink_exists("/fake_symlink").await);
+        assert!(!fs.exists("/fake_symlink"));
 
-//         // Checking rename
-//         fs.write("/rename_1", "abc").await.unwrap();
-//         fs.write("/rename_2", "123").await.unwrap();
-//         fs.rename("/rename_2", "/rename_1").await.unwrap();
-//         assert_eq!(fs.read_to_string("/rename_1").await.unwrap(), "123");
+        // Checking rename
+        fs.write("/rename_1", "abc").await.unwrap();
+        fs.write("/rename_2", "123").await.unwrap();
+        fs.rename("/rename_2", "/rename_1").await.unwrap();
+        assert_eq!(fs.read_to_string("/rename_1").await.unwrap(), "123");
 
-//         // Checking open
-//         assert!(fs.open("/does_not_exist").await.is_err());
-//         assert!(fs.open("/rename_1").await.is_ok());
-//     }
+        // Checking open
+        assert!(fs.open("/does_not_exist").await.is_err());
+        assert!(fs.open("/rename_1").await.is_ok());
+    }
 
-//     #[tokio::test]
-//     async fn test_chroot_tempdir() {
-//         let fs = Fs::new();
-//         let tempdir = fs.create_tempdir().await.unwrap();
-//         if let Fs::Chroot(root) = fs {
-//             assert_eq!(tempdir.path().parent().unwrap(), root.path());
-//         } else {
-//             panic!("tempdir should be created under root");
-//         }
-//     }
+    #[tokio::test]
+    async fn test_chroot_tempdir() {
+        let fs = Fs::new();
+        let tempdir = fs.create_tempdir().await.unwrap();
+        if let Fs::Chroot(root) = fs {
+            assert_eq!(tempdir.path().parent().unwrap(), root.path());
+        } else {
+            panic!("tempdir should be created under root");
+        }
+    }
 
-//     #[tokio::test]
-//     async fn test_create_new() {
-//         let fs = Fs::new();
-//         fs.create_new("my_file.txt").await.unwrap();
-//         assert!(fs.create_new("my_file.txt").await.is_err());
-//     }
-// }
+    #[tokio::test]
+    async fn test_create_new() {
+        let fs = Fs::new();
+        fs.create_new("my_file.txt").await.unwrap();
+        assert!(fs.create_new("my_file.txt").await.is_err());
+    }
+}

@@ -1,11 +1,12 @@
 mod agent;
 mod commands;
 mod generator;
-pub(crate) mod merging_format;
+mod kdl;
 mod os;
 pub mod output;
 mod schema;
 mod source;
+
 use {
     crate::{generator::Generator, os::Fs},
     clap::Parser,
@@ -14,8 +15,6 @@ use {
     tracing_subscriber::prelude::*,
 };
 pub type Result<T> = color_eyre::Result<T>;
-
-pub const DEFAULT_AGENT_RESOURCES: &[&str] = &["file://AGENTS.md", "file://README.md"];
 
 fn init_tracing(debug: bool, trace_agent: Option<&str>) {
     let filter = if let Some(agent) = trace_agent {
@@ -113,7 +112,7 @@ async fn main() -> Result<()> {
     match cli.command {
         commands::Command::Validate(args) | commands::Command::Generate(args) => {
             let results = q_generator_config.write_all(dry_run).await?;
-            format.result(dry_run, args.show_skeletons, results)?;
+            format.result(dry_run, args.show_templates, results)?;
         }
         _ => {}
     };
