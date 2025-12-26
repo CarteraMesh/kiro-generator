@@ -104,7 +104,7 @@ pub struct KdlAgent {
     pub(super) tool_aliases: HashSet<ToolAliasKdl>,
     /// Tools builtin to kiro
     #[knuffel(child, default)]
-    pub(super) native_tool: NativeTools,
+    pub native_tool: NativeTools,
 }
 
 impl Debug for KdlAgent {

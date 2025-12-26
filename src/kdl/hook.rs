@@ -266,23 +266,6 @@ mod tests {
         }
     }
 
-    impl HookAgentSpawn {
-        fn randojkh() -> Self {
-            let value = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            Self {
-                name: format!("{value}"),
-                command: format!("{value}"),
-                timeout_ms: value,
-                max_output_size: 0,
-                cache_ttl_seconds: value,
-                matcher: Some(format!("{value}")),
-            }
-        }
-    }
-
     #[test_log::test]
     pub fn test_hooks_empty() -> Result<()> {
         let child = HookPart::default();

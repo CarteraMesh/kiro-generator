@@ -1,7 +1,7 @@
 use {
     crate::{
         Result,
-        agent::{Agent, KgAgent, ToolTarget},
+        agent::{Agent, ToolTarget},
         generator::AgentResult,
         source::KdlSources,
     },
@@ -77,11 +77,6 @@ fn serialize_yaml(label: &str, values: &[String]) -> Option<Cell> {
 }
 
 impl OutputFormat {
-    pub fn trace_agent(&self, agent: &KgAgent) -> Result<()> {
-        eprintln!("{}", serde_json::to_string_pretty(agent)?);
-        Ok(())
-    }
-
     pub fn sources(&self, sources: &KdlSources) -> Result<()> {
         if !enabled!(tracing::Level::DEBUG) {
             return Ok(());
@@ -115,7 +110,7 @@ impl OutputFormat {
         let mut row = Row::new();
 
         // Agent name with skeleton indicator
-        let name_cell = if result.agent.skeleton() {
+        let name_cell = if result.is_skeleton() {
             Cell::new(format!("{} {}", result.agent.name, "💀"))
         } else {
             Cell::new(&result.agent.name)
@@ -123,7 +118,7 @@ impl OutputFormat {
         row.add_cell(name_cell);
 
         // Location: 🏠 for global, 📁 for local
-        let location = if result.agent.skeleton() {
+        let location = if result.is_skeleton() {
             Cell::new("")
         } else if result.destination.is_absolute() {
             Cell::new("🏠")
@@ -134,7 +129,7 @@ impl OutputFormat {
 
         // MCP servers (only enabled ones)
         let mut servers = Vec::new();
-        for (k, v) in &result.agent.mcp_servers.mcp_servers {
+        for (k, v) in &result.agent.mcp_servers() {
             if !v.disabled {
                 servers.push(k.clone());
             }
@@ -145,20 +140,20 @@ impl OutputFormat {
         // Allowed tools
         let mut allowed_tools: Vec<String> = result
             .agent
-            .allowed_tools
-            .0
+            .allowed_tools()
             .iter()
             .filter(|t| !t.is_empty())
             .cloned()
             .collect();
         allowed_tools.sort();
         let mut enabled_tools = Vec::with_capacity(allowed_tools.len());
+        let mcps = result.agent.mcp_servers();
         for t in allowed_tools {
             if t.len() < 2 {
                 continue;
             }
             if let Some(server_name) = t.strip_prefix("@") {
-                match result.agent.mcp_servers.mcp_servers.get(server_name) {
+                match mcps.get(server_name) {
                     Some(mcp) if !mcp.disabled => {} // enabled, keep it
                     _ => continue,                   // disabled or doesn't exist, skip it
                 }
@@ -274,7 +269,7 @@ impl OutputFormat {
                 }
 
                 for result in &results {
-                    if show_skeletons || !result.agent.skeleton() {
+                    if show_skeletons || !result.is_skeleton() {
                         table.add_row(self.agent_result_to_row(result));
                     }
                 }

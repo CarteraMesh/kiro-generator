@@ -1,12 +1,12 @@
 use {
     crate::{
         Result,
-        agent::{Agent, KgAgent, ToolMerge, ToolTarget},
+        agent::{Agent, ToolTarget},
+        kdl::KdlAgent,
         os::Fs,
     },
     color_eyre::eyre::{Context, eyre},
-    config::Config,
-    serde::{Deserialize, Serialize},
+    serde::Serialize,
     std::{
         collections::{HashMap, HashSet},
         fmt::{self, Debug},
@@ -22,59 +22,48 @@ use crate::source::*;
 
 pub struct AgentResult {
     pub kiro_agent: Agent,
-    pub agent: KgAgent,
+    pub agent: KdlAgent,
     pub writable: bool,
     pub destination: PathBuf,
 }
 
 impl AgentResult {
+    pub fn is_skeleton(&self) -> bool {
+        self.agent.is_skeleton()
+    }
+
     pub fn forced(&self, target: &ToolTarget) -> Vec<String> {
         match target {
             ToolTarget::Read => self
                 .agent
                 .get_tool_read()
-                .force_allowed_paths
-                .0
+                .force
                 .iter()
                 .cloned()
+                .map(|f| f.to_string())
                 .collect(),
             ToolTarget::Write => self
                 .agent
                 .get_tool_write()
-                .force_allowed_paths
-                .0
+                .force
                 .iter()
                 .cloned()
+                .map(|f| f.to_string())
                 .collect(),
             ToolTarget::Shell => self
                 .agent
                 .get_tool_shell()
-                .force_allowed_commands
-                .0
+                .force
                 .iter()
                 .cloned()
+                .map(|f| f.to_string())
                 .collect(),
             _ => vec![],
         }
     }
 
     pub fn resources(&self) -> Vec<String> {
-        self.agent.resources.0.iter().cloned().collect()
-    }
-}
-
-/// Container for all agent declarations from kg.toml files
-#[derive(Debug, Default, Deserialize)]
-struct KgConfig {
-    #[serde(default)]
-    agents: HashMap<String, serde_json::Value>,
-}
-
-impl KgConfig {
-    fn get(&self, name: &str) -> Result<String> {
-        self.agents.get(name).map_or(Ok(String::new()), |value| {
-            toml::to_string(value).wrap_err_with(|| format!("failed to toml serialize {name}"))
-        })
+        self.agent.resources()
     }
 }
 
@@ -86,6 +75,7 @@ pub struct Generator {
     #[serde(skip)]
     fs: Fs,
     #[serde(skip)]
+    #[allow(unused)]
     format: crate::output::OutputFormat,
 }
 
@@ -149,11 +139,11 @@ impl Generator {
     }
 
     #[tracing::instrument(skip(dry_run), level = "info")]
-    pub(crate) async fn write(&self, agent: KgAgent, dry_run: bool) -> Result<AgentResult> {
+    pub(crate) async fn write(&self, agent: KdlAgent, dry_run: bool) -> Result<AgentResult> {
         let destination = self.destination_dir(&agent.name);
         let result = AgentResult {
             kiro_agent: Agent::from(&agent),
-            writable: !agent.skeleton(),
+            writable: !agent.is_skeleton(),
             destination,
             agent,
         };

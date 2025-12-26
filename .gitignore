@@ -3,3 +3,4 @@
 .DS_Store
 .kiro/agents/
 docs/book/
+.kiro/settings/

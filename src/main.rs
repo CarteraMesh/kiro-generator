@@ -2,7 +2,6 @@ mod agent;
 mod commands;
 mod generator;
 mod kdl;
-pub(crate) mod merging_format;
 mod os;
 pub mod output;
 mod schema;

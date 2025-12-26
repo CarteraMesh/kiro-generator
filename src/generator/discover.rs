@@ -5,21 +5,6 @@ use {
     std::{fmt::Display, ops::Deref, path::Path},
 };
 
-fn add_local(
-    fs: &Fs,
-    agent: String,
-    raw: String,
-    agent_sources: &mut Vec<AgentSource>,
-    local_agents: &mut HashSet<String>,
-) {
-    agent_sources.push(AgentSource::LocalInline(raw));
-    let (local, empty) = AgentSource::new_local_agent(&agent, fs);
-    if !empty {
-        agent_sources.push(local);
-        local_agents.insert(agent.clone());
-    }
-}
-
 pub fn load_inline(fs: &Fs, path: impl AsRef<Path>) -> Result<GeneratorConfig> {
     if fs.exists(&path) {
         let content = fs
@@ -253,6 +238,17 @@ mod tests {
 
     #[tokio::test]
     #[test_log::test]
+    async fn test_discover_errors() {
+        let fs = Fs::new();
+        let e = load_inline(
+            &fs,
+            PathBuf::from(".kiro").join("generators").join("bad.kdl"),
+        );
+        assert!(e.is_err());
+    }
+
+    #[tokio::test]
+    #[test_log::test]
     async fn test_discover_both_agents_kdl() -> Result<()> {
         let fs = Fs::new();
         let g_path = PathBuf::from(ACTIVE_USER_HOME)
@@ -273,6 +269,9 @@ mod tests {
                 assert_eq!(agent_sources.len(), 3);
             }
         }
+
+        assert!(!format!("{resolved}").is_empty());
+        assert!(!format!("{resolved:?}").is_empty());
         Ok(())
     }
 }
