@@ -98,9 +98,16 @@ impl HookPart {
                 for h in self.agent_spawn {
                     if let Some(o) = other.agent_spawn.iter().find(|i| i.name == h.name) {
                         hooks.push(h.merge(o.clone()));
+                    } else {
+                        hooks.push(h);
                     }
                 }
                 self.agent_spawn = hooks;
+                for o in other.agent_spawn.into_iter() {
+                    if !self.agent_spawn.iter().any(|h| h.name == o.name) {
+                        self.agent_spawn.push(o);
+                    }
+                }
             }
             (true, false) => self.agent_spawn = other.agent_spawn,
             _ => {}
@@ -115,9 +122,16 @@ impl HookPart {
                 for h in self.user_prompt_submit {
                     if let Some(o) = other.user_prompt_submit.iter().find(|i| i.name.eq(&h.name)) {
                         hooks.push(h.merge(o.clone()));
+                    } else {
+                        hooks.push(h);
                     }
                 }
                 self.user_prompt_submit = hooks;
+                for o in other.user_prompt_submit.into_iter() {
+                    if !self.user_prompt_submit.iter().any(|h| h.name == o.name) {
+                        self.user_prompt_submit.push(o);
+                    }
+                }
             }
             (true, false) => self.user_prompt_submit = other.user_prompt_submit,
             _ => {}
@@ -129,9 +143,16 @@ impl HookPart {
                 for h in self.pre_tool_use {
                     if let Some(o) = other.pre_tool_use.iter().find(|i| i.name.eq(&h.name)) {
                         hooks.push(h.merge(o.clone()));
+                    } else {
+                        hooks.push(h);
                     }
                 }
                 self.pre_tool_use = hooks;
+                for o in other.pre_tool_use.into_iter() {
+                    if !self.pre_tool_use.iter().any(|h| h.name == o.name) {
+                        self.pre_tool_use.push(o);
+                    }
+                }
             }
             (true, false) => self.pre_tool_use = other.pre_tool_use,
             _ => {}
@@ -146,9 +167,16 @@ impl HookPart {
                 for h in self.post_tool_use {
                     if let Some(o) = other.post_tool_use.iter().find(|i| i.name.eq(&h.name)) {
                         hooks.push(h.merge(o.clone()));
+                    } else {
+                        hooks.push(h);
                     }
                 }
                 self.post_tool_use = hooks;
+                for o in other.post_tool_use.into_iter() {
+                    if !self.post_tool_use.iter().any(|h| h.name == o.name) {
+                        self.post_tool_use.push(o);
+                    }
+                }
             }
             (true, false) => self.post_tool_use = other.post_tool_use,
             _ => {}
@@ -160,9 +188,16 @@ impl HookPart {
                 for h in self.stop {
                     if let Some(o) = other.stop.iter().find(|i| i.name.eq(&h.name)) {
                         hooks.push(h.merge(o.clone()));
+                    } else {
+                        hooks.push(h);
                     }
                 }
                 self.stop = hooks;
+                for o in other.stop.into_iter() {
+                    if !self.stop.iter().any(|h| h.name == o.name) {
+                        self.stop.push(o);
+                    }
+                }
             }
             (true, false) => self.stop = other.stop,
             _ => {}
@@ -226,7 +261,7 @@ impl HookPart {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::Result};
+    use {super::*, crate::Result, std::time::Duration};
 
     macro_rules! rando_hook {
         ($name:ident) => {
@@ -237,7 +272,7 @@ mod tests {
                         .unwrap()
                         .as_secs();
                     Self {
-                        name: format!("{value}"),
+                        name: format!("$name-{value}"),
                         command: format!("{value}"),
                         timeout_ms: value,
                         max_output_size: 0,
@@ -298,6 +333,20 @@ mod tests {
         let before = child.clone();
         let merged = child.merge(parent);
         assert_eq!(merged, before);
+        Ok(())
+    }
+
+    #[test_log::test]
+    pub fn test_hooks_merge_parent() -> Result<()> {
+        let child = HookPart::randomize();
+        std::thread::sleep(Duration::from_millis(1300)); // see randomize function
+        let parent = HookPart::randomize();
+        let merged = child.merge(parent);
+        assert_eq!(merged.agent_spawn.len(), 2);
+        assert_eq!(merged.user_prompt_submit.len(), 2);
+        assert_eq!(merged.pre_tool_use.len(), 2);
+        assert_eq!(merged.post_tool_use.len(), 2);
+        assert_eq!(merged.stop.len(), 2);
         Ok(())
     }
 }
