@@ -21,3 +21,29 @@ impl Borrow<str> for OriginalToolName {
         self.0.as_str()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn original_tool_name_deref() {
+        let name = OriginalToolName("test".into());
+        assert_eq!(&*name, "test");
+    }
+
+    #[test]
+    fn original_tool_name_borrow() {
+        let name = OriginalToolName("test".into());
+        let borrowed: &str = name.borrow();
+        assert_eq!(borrowed, "test");
+    }
+
+    #[test]
+    fn original_tool_name_serde() {
+        let name = OriginalToolName("test".into());
+        let json = serde_json::to_string(&name).unwrap();
+        let deserialized: OriginalToolName = serde_json::from_str(&json).unwrap();
+        assert_eq!(name, deserialized);
+    }
+}

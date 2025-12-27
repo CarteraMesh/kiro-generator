@@ -227,6 +227,18 @@ impl KdlAgent {
     ///
     /// This allows users to configure tools not yet supported by kg's schema.
     pub fn extra_tool_settings(&self) -> crate::Result<HashMap<String, serde_json::Value>> {
-        self.tool_settings.iter().map(|t| t.to_value()).collect()
+        let mut result = HashMap::new();
+        for setting in &self.tool_settings {
+            let (name, value) = setting.to_value()?;
+            if result.contains_key(&name) {
+                return Err(color_eyre::eyre::eyre!(
+                    "[{self}] - Duplicate tool-setting '{}' found. Each tool-setting name must be \
+                     unique.",
+                    name
+                ));
+            }
+            result.insert(name, value);
+        }
+        Ok(result)
     }
 }

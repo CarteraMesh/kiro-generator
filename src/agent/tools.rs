@@ -106,3 +106,50 @@ pub struct WriteTool {
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
     pub denied_paths: HashSet<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_target_display() {
+        assert_eq!(ToolTarget::Aws.to_string(), "aws");
+        assert_eq!(ToolTarget::Shell.to_string(), "shell");
+    }
+
+    #[test]
+    fn tool_target_as_ref() {
+        assert_eq!(ToolTarget::Read.as_ref(), "read");
+        assert_eq!(ToolTarget::Write.as_ref(), "write");
+    }
+
+    #[test]
+    fn aws_tool_default() {
+        let tool = AwsTool::default();
+        assert!(tool.auto_allow_readonly);
+        assert!(tool.allowed_services.is_empty());
+    }
+
+    #[test]
+    fn execute_shell_tool_default() {
+        let tool = ExecuteShellTool::default();
+        assert!(!tool.deny_by_default);
+        assert!(!tool.auto_allow_readonly);
+    }
+
+    #[test]
+    fn read_tool_serde() {
+        let tool = ReadTool::default();
+        let json = serde_json::to_string(&tool).unwrap();
+        let deserialized: ReadTool = serde_json::from_str(&json).unwrap();
+        assert_eq!(tool, deserialized);
+    }
+
+    #[test]
+    fn write_tool_serde() {
+        let tool = WriteTool::default();
+        let json = serde_json::to_string(&tool).unwrap();
+        let deserialized: WriteTool = serde_json::from_str(&json).unwrap();
+        assert_eq!(tool, deserialized);
+    }
+}

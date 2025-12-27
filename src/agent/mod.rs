@@ -101,31 +101,39 @@ impl TryFrom<&KdlAgent> for Agent {
         let mut tools_settings = HashMap::new();
 
         let tool: AwsTool = native_tools.into();
+        let tool_name = ToolTarget::Aws.to_string();
         if tool != AwsTool::default() {
             tools_settings.insert(
-                ToolTarget::Aws.to_string(),
-                serde_json::to_value(&tool).unwrap(),
+                tool_name.to_string(),
+                serde_json::to_value(&tool)
+                    .map_err(|e| eyre!("Failed to serialize {tool_name} tool configuration {e}"))?,
             );
         }
         let tool: ReadTool = native_tools.into();
+        let tool_name = ToolTarget::Read.to_string();
         if tool != ReadTool::default() {
             tools_settings.insert(
-                ToolTarget::Read.to_string(),
-                serde_json::to_value(&tool).unwrap(),
+                tool_name.to_string(),
+                serde_json::to_value(&tool)
+                    .map_err(|e| eyre!("Failed to serialize {tool_name} tool configuration {e}"))?,
             );
         }
         let tool: WriteTool = native_tools.into();
+        let tool_name = ToolTarget::Write.to_string();
         if tool != WriteTool::default() {
             tools_settings.insert(
-                ToolTarget::Write.to_string(),
-                serde_json::to_value(&tool).unwrap(),
+                tool_name.to_string(),
+                serde_json::to_value(&tool)
+                    .map_err(|e| eyre!("Failed to serialize {tool_name} tool configuration {e}"))?,
             );
         }
         let tool: ExecuteShellTool = native_tools.into();
+        let tool_name = ToolTarget::Shell.to_string();
         if tool != ExecuteShellTool::default() {
             tools_settings.insert(
-                ToolTarget::Shell.to_string(),
-                serde_json::to_value(&tool).unwrap(),
+                tool_name.to_string(),
+                serde_json::to_value(&tool)
+                    .map_err(|e| eyre!("Failed to serialize {tool_name} tool configuration {e}"))?,
             );
         }
         let default_agent = Self::default();
