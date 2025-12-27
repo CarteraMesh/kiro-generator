@@ -8,6 +8,7 @@ use {
         },
         kdl::native::{AwsTool, ExecuteShellTool, NativeTools, ReadTool, WriteTool},
     },
+    color_eyre::eyre::WrapErr,
     knuffel::Decode,
     std::{
         collections::{HashMap, HashSet},
@@ -61,6 +62,37 @@ pub(super) struct ToolAliasKdl {
     to: String,
 }
 
+/// Raw JSON tool settings for forward compatibility.
+///
+/// Allows users to configure tool settings not yet supported by kg's schema.
+/// The JSON must be a valid object (not array or primitive).
+///
+/// See https://kiro.dev/docs/cli/custom-agents/configuration-reference/#toolssettings-field
+#[derive(Decode, Clone, Debug)]
+pub struct ToolSetting {
+    #[knuffel(argument)]
+    name: String,
+    #[knuffel(child, unwrap(argument))]
+    json: String,
+}
+
+impl ToolSetting {
+    fn to_value(&self) -> crate::Result<(String, serde_json::Value)> {
+        let v: serde_json::Value = serde_json::from_str(&self.json)
+            .wrap_err_with(|| format!("Failed to parse JSON for tool-setting '{}'", self.name))?;
+
+        if !v.is_object() {
+            return Err(color_eyre::eyre::eyre!(
+                "tool-setting '{}' must be a JSON object, got: {}",
+                self.name,
+                v
+            ));
+        }
+
+        Ok((self.name.clone(), v))
+    }
+}
+
 #[derive(Decode, Clone, Default)]
 pub struct KdlAgent {
     /// Name of the agent
@@ -105,6 +137,9 @@ pub struct KdlAgent {
     /// Tools builtin to kiro
     #[knuffel(child, default)]
     pub native_tool: NativeTools,
+
+    #[knuffel(children(name = "tool-setting"), default)]
+    pub(super) tool_settings: Vec<ToolSetting>,
 }
 
 impl Debug for KdlAgent {
@@ -186,5 +221,24 @@ impl KdlAgent {
             .iter()
             .map(|m| (m.name.clone(), m.into()))
             .collect()
+    }
+
+    /// Parse raw JSON tool settings into a map.
+    ///
+    /// This allows users to configure tools not yet supported by kg's schema.
+    pub fn extra_tool_settings(&self) -> crate::Result<HashMap<String, serde_json::Value>> {
+        let mut result = HashMap::new();
+        for setting in &self.tool_settings {
+            let (name, value) = setting.to_value()?;
+            if result.contains_key(&name) {
+                return Err(color_eyre::eyre::eyre!(
+                    "[{self}] - Duplicate tool-setting '{}' found. Each tool-setting name must be \
+                     unique.",
+                    name
+                ));
+            }
+            result.insert(name, value);
+        }
+        Ok(result)
     }
 }

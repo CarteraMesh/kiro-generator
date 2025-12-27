@@ -18,6 +18,7 @@ impl KdlAgent {
         self.tool_aliases.extend(other.tool_aliases);
         self.mcp.extend(other.mcp);
         self.inherits.parents.extend(other.inherits.parents);
+        self.tool_settings.extend(other.tool_settings);
 
         // Hooks are deep merged
         self.hook = match (self.hook, other.hook) {

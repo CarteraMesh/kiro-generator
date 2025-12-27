@@ -61,7 +61,7 @@ pub struct Agent {
     /// actual schema differs by tools and is documented in detail in our
     /// documentation
     #[serde(default)]
-    pub tools_settings: HashMap<ToolTarget, serde_json::Value>,
+    pub tools_settings: HashMap<String, serde_json::Value>,
     /// The model ID to use for this agent. If not specified, uses the default
     /// model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -93,33 +93,59 @@ impl Agent {
     }
 }
 
-impl From<&KdlAgent> for Agent {
-    fn from(value: &KdlAgent) -> Self {
+impl TryFrom<&KdlAgent> for Agent {
+    type Error = color_eyre::Report;
+
+    fn try_from(value: &KdlAgent) -> std::result::Result<Self, Self::Error> {
         let native_tools = &value.native_tool;
         let mut tools_settings = HashMap::new();
 
         let tool: AwsTool = native_tools.into();
+        let tool_name = ToolTarget::Aws.to_string();
         if tool != AwsTool::default() {
-            tools_settings.insert(ToolTarget::Aws, serde_json::to_value(&tool).unwrap());
+            tools_settings.insert(
+                tool_name.to_string(),
+                serde_json::to_value(&tool)
+                    .map_err(|e| eyre!("Failed to serialize {tool_name} tool configuration {e}"))?,
+            );
         }
         let tool: ReadTool = native_tools.into();
+        let tool_name = ToolTarget::Read.to_string();
         if tool != ReadTool::default() {
-            tools_settings.insert(ToolTarget::Read, serde_json::to_value(&tool).unwrap());
+            tools_settings.insert(
+                tool_name.to_string(),
+                serde_json::to_value(&tool)
+                    .map_err(|e| eyre!("Failed to serialize {tool_name} tool configuration {e}"))?,
+            );
         }
         let tool: WriteTool = native_tools.into();
+        let tool_name = ToolTarget::Write.to_string();
         if tool != WriteTool::default() {
-            tools_settings.insert(ToolTarget::Write, serde_json::to_value(&tool).unwrap());
+            tools_settings.insert(
+                tool_name.to_string(),
+                serde_json::to_value(&tool)
+                    .map_err(|e| eyre!("Failed to serialize {tool_name} tool configuration {e}"))?,
+            );
         }
         let tool: ExecuteShellTool = native_tools.into();
+        let tool_name = ToolTarget::Shell.to_string();
         if tool != ExecuteShellTool::default() {
-            tools_settings.insert(ToolTarget::Shell, serde_json::to_value(&tool).unwrap());
+            tools_settings.insert(
+                tool_name.to_string(),
+                serde_json::to_value(&tool)
+                    .map_err(|e| eyre!("Failed to serialize {tool_name} tool configuration {e}"))?,
+            );
         }
         let default_agent = Self::default();
         let tools = value.tools().clone();
         let allowed_tools = value.allowed_tools().clone();
         let resources: HashSet<String> = value.resources().map(|s| s.to_string()).collect();
 
-        Self {
+        // Extra tool settings override native tools
+        let extra_tool_settings = value.extra_tool_settings()?;
+        tools_settings.extend(extra_tool_settings);
+
+        Ok(Self {
             name: value.name.clone(),
             description: value.description.clone(),
             prompt: value.prompt.clone(),
@@ -146,7 +172,7 @@ impl From<&KdlAgent> for Agent {
             tools_settings,
             model: value.model.clone(),
             include_mcp_json: value.include_mcp_json(),
-        }
+        })
     }
 }
 

@@ -72,3 +72,35 @@ impl Hook {
         DEFAULT_CACHE_TTL_SECONDS
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hook_trigger_display() {
+        assert_eq!(HookTrigger::AgentSpawn.to_string(), "agentSpawn");
+        assert_eq!(HookTrigger::Stop.to_string(), "stop");
+    }
+
+    #[test]
+    fn hook_defaults() {
+        assert_eq!(Hook::default_timeout_ms(), 30_000);
+        assert_eq!(Hook::default_max_output_size(), 10_240);
+        assert_eq!(Hook::default_cache_ttl_seconds(), 0);
+    }
+
+    #[test]
+    fn hook_serde() {
+        let hook = Hook {
+            command: "test".into(),
+            timeout_ms: 1000,
+            max_output_size: 500,
+            cache_ttl_seconds: 10,
+            matcher: Some("*.rs".into()),
+        };
+        let json = serde_json::to_string(&hook).unwrap();
+        let deserialized: Hook = serde_json::from_str(&json).unwrap();
+        assert_eq!(hook, deserialized);
+    }
+}

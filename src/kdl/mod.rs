@@ -4,7 +4,7 @@ mod hook;
 mod mcp;
 mod merge;
 mod native;
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::Debug};
 
 pub use agent::KdlAgent;
 
@@ -12,6 +12,12 @@ pub use agent::KdlAgent;
 pub struct GeneratorConfig {
     #[knuffel(children(name = "agent"))]
     pub agents: Vec<KdlAgent>,
+}
+
+impl Debug for GeneratorConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "agents={}", self.agents.len())
+    }
 }
 
 impl GeneratorConfig {
@@ -95,6 +101,10 @@ mod tests {
                       override "git pull .*"
                    }
                 }
+
+               tool-setting "@git/status" {
+                  json "{ \"git_user\": \"$GIT_USER\" }"
+               }
             }
         "#;
 
@@ -152,6 +162,14 @@ mod tests {
         assert!(aws_docs.oauth.is_some());
 
         assert_eq!(agent.tool_aliases().len(), 1);
+
+        let extra = agent.extra_tool_settings()?;
+        assert_eq!(extra.len(), 1);
+        assert!(extra.contains_key("@git/status"));
+        let git_status = extra.get("@git/status").unwrap();
+        assert!(git_status.is_object());
+        assert_eq!(git_status["git_user"], "$GIT_USER");
+
         Ok(())
     }
 
@@ -169,11 +187,13 @@ mod tests {
                 return Err(eyre!("failed to parse {kdl_agents}"));
             }
         };
+        assert!(!format!("{config:?}").is_empty());
         assert_eq!(config.agents.len(), 1);
         let agent = config.agents[0].clone();
         assert_eq!(agent.name, "test");
         assert!(agent.model.is_none());
         assert!(agent.is_template());
+
         Ok(())
     }
 
@@ -248,6 +268,27 @@ mod tests {
         };
 
         assert_eq!(agent.description.unwrap_or_default(), "agent from file");
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn test_tool_setting_invalid_json() -> crate::Result<()> {
+        let kdl = r#"
+            agent "test" {
+                tool-setting "bad" {
+                    json "{ invalid json }"
+                }
+            }
+        "#;
+        let config: GeneratorConfig = parse("test.kdl", kdl)?;
+        let result = config.agents[0].extra_tool_settings();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to parse JSON")
+        );
         Ok(())
     }
 }

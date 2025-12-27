@@ -139,6 +139,10 @@ mod tests {
         assert!(aws.allow.list.contains("s3"));
         assert!(aws.deny.list.contains("iam"));
 
+        // check try_from
+        let results = generator.write_all(true).await?;
+        assert!(!results.is_empty());
+
         Ok(())
     }
 }

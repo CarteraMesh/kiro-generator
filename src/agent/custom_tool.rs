@@ -57,3 +57,42 @@ pub struct CustomToolConfig {
 pub fn tool_default_timeout() -> u64 {
     120 * 1000
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transport_type_default() {
+        assert_eq!(tool_default_timeout(), 120 * 1000);
+        assert_eq!(TransportType::default(), TransportType::Stdio);
+    }
+
+    #[test]
+    fn custom_tool_config_serde() {
+        let config = CustomToolConfig {
+            r#type: TransportType::Http,
+            url: "http://test".into(),
+            headers: HashMap::new(),
+            oauth: None,
+            command: "cmd".into(),
+            args: vec!["arg1".into()],
+            env: HashMap::new(),
+            timeout: 5000,
+            disabled: false,
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let deserialized: CustomToolConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn oauth_config_serde() {
+        let oauth = OAuthConfig {
+            redirect_uri: Some("localhost:8080".into()),
+        };
+        let json = serde_json::to_string(&oauth).unwrap();
+        let deserialized: OAuthConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(oauth, deserialized);
+    }
+}

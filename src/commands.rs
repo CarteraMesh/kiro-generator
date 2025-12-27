@@ -122,7 +122,7 @@ impl Cli {
     /// Return home dir and ~/.kiro/generators/kg.kdl
     pub fn config(&self) -> crate::Result<(PathBuf, PathBuf)> {
         let home_dir = dirs::home_dir().ok_or(eyre!("cannot locate home directory"))?;
-        let cfg = home_dir.join(".kiro").join("generators").join("kg.kdl");
+        let cfg = home_dir.join(".kiro").join("generators");
         Ok((home_dir, cfg))
     }
 }
@@ -248,7 +248,7 @@ mod tests {
         let result = cli.config();
         assert!(result.is_ok());
         let (home, cfg) = result.unwrap();
-        assert!(cfg.ends_with(".kiro/generators/kg.kdl"));
+        assert!(cfg.ends_with(".kiro/generators"));
         assert!(cfg.starts_with(&home));
     }
 }
