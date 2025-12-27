@@ -142,7 +142,7 @@ impl Generator {
     pub(crate) async fn write(&self, agent: KdlAgent, dry_run: bool) -> Result<AgentResult> {
         let destination = self.destination_dir(&agent.name);
         let result = AgentResult {
-            kiro_agent: Agent::from(&agent),
+            kiro_agent: Agent::try_from(&agent)?,
             writable: !agent.is_template(),
             destination,
             agent,

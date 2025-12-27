@@ -95,6 +95,10 @@ mod tests {
                       override "git pull .*"
                    }
                 }
+
+               tool-setting "@git/status" {
+                  json "{ \"git_user\": \"$GIT_USER\" }"
+               }
             }
         "#;
 
@@ -152,6 +156,14 @@ mod tests {
         assert!(aws_docs.oauth.is_some());
 
         assert_eq!(agent.tool_aliases().len(), 1);
+
+        let extra = agent.extra_tool_settings()?;
+        assert_eq!(extra.len(), 1);
+        assert!(extra.contains_key("@git/status"));
+        let git_status = extra.get("@git/status").unwrap();
+        assert!(git_status.is_object());
+        assert_eq!(git_status["git_user"], "$GIT_USER");
+
         Ok(())
     }
 

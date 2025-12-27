@@ -30,6 +30,8 @@ pub struct KdlAgentFileSource {
     pub(super) tool_aliases: HashSet<ToolAliasKdl>,
     #[knuffel(child, default)]
     pub(super) native_tool: NativeTools,
+    #[knuffel(children(name = "tool-setting"), default)]
+    pub(super) tool_settings: Vec<ToolSetting>,
 }
 
 impl KdlAgent {
@@ -70,6 +72,7 @@ impl KdlAgent {
             mcp: file_source.mcp,
             tool_aliases: file_source.tool_aliases,
             native_tool: file_source.native_tool,
+            tool_settings: file_source.tool_settings,
         }
     }
 }
