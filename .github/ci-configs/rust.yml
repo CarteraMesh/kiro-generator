@@ -38,6 +38,8 @@ jobs:
       cargo run -- --format json v
       cargo run -- g
       cargo run -- generate
+      cargo run -- init
+      cargo run -- validate --global
 
     matrix:
       os: []
