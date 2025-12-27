@@ -39,7 +39,8 @@ pub struct Cli {
 
 #[derive(clap::Args, Clone, Default)]
 pub struct InitArgs {
-    /// Init to this directory, otherwise use $HOME/.kiro
+    /// Directory where configuration will be created.
+    /// Defaults to $HOME/.kiro/generators if not specified.
     pub location: Option<PathBuf>,
 }
 

@@ -60,6 +60,20 @@ fn init_tracing(debug: bool, trace_agent: Option<&str>) {
     }
 }
 
+/// Initialize a new kg configuration directory.
+///
+/// Creates the specified directory (if needed) and populates it with
+/// default configuration files: kg.kdl, default.kdl, and example.kdl.
+///
+/// # Arguments
+/// * `fs` - Filesystem abstraction for testability
+/// * `gen_dir` - Target directory path
+///
+/// # Errors
+/// Returns an error if:
+/// - kg.kdl already exists in the target directory
+/// - Directory creation fails
+/// - File write operations fail
 async fn init(fs: &Fs, gen_dir: impl AsRef<Path>) -> Result<()> {
     let gen_dir = gen_dir.as_ref();
     let kg_config = gen_dir.join("kg.kdl");
@@ -121,13 +135,14 @@ async fn main() -> Result<()> {
     let (home_dir, home_config) = cli.config()?;
     let fs = Fs::new();
 
-    if let commands::Command::Init(d) = &cli.command {
-        let dir = d
-            .location
-            .clone()
-            .unwrap_or(home_dir.join(".kiro").join("generators"));
+    if let commands::Command::Init(args) = &cli.command {
+        let dir = match &args.location {
+            Some(path) => path.clone(),
+            None => home_dir.join(".kiro").join("generators"),
+        };
         return init(&fs, dir).await;
-    };
+    }
+
     if global_mode {
         debug!(
             "changing working directory to {}",
@@ -184,6 +199,10 @@ mod tests {
         super::init(&fs, &dir).await?;
         assert!(fs.exists(&dir));
         assert!(fs.exists(dir.join("kg.kdl")));
+
+        let result = init(&fs, &dir).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("already exists"));
         Ok(())
     }
 }
