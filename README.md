@@ -2,18 +2,21 @@
 
 [![Crates.io](https://img.shields.io/crates/v/kiro-generator.svg)](https://crates.io/crates/kiro-generator)
 [![Docs.rs](https://docs.rs/kiro-generator/badge.svg)](https://docs.rs/kiro-generator)
-[![CI](https://github.com/CarteraMesh/kiro-generator/workflows/test/badge.svg)](https://github.com/CarteraMesh/kiro-generator/actions)
+[![ci](https://github.com/CarteraMesh/kiro-generator/actions/workflows/test.yml/badge.svg)](https://github.com/CarteraMesh/kiro-generator/actions/workflows/test.yml)
 [![Cov](https://codecov.io/github/CarteraMesh/kiro-generator/graph/badge.svg?token=dILa1k9tlW)](https://codecov.io/github/CarteraMesh/kiro-generator)
 
 ## About
 
-`kiro-generator` is a tool for managing and generating [Kiro](https://kiro.dev/docs/) custom agent [files](https://kiro.dev/docs/cli/custom-agents/).
+`kiro-generator` (aka `kg`) is a tool for managing and generating [Kiro](https://kiro.dev/docs/) custom agent [files](https://kiro.dev/docs/cli/custom-agents/).
 
 ## Quick Start 
 
-1. Define your agents in `~/.kiro/generators/kg.toml`
+1. Init you config
 
-`cat ~/.kiro/generators/kg.toml`
+```shell
+kg init
+TODO show output
+```
 
 ```toml
 [agents]

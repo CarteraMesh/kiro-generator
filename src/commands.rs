@@ -59,9 +59,9 @@ pub enum Command {
     /// local agents are generated. Use --global to generate $HOME agents
     #[command(alias = "g")]
     Generate(Args),
-    /// Not implemented yet
-    #[command(alias = "m", hide = true)]
-    Migrate,
+    /// Create default configuration in directory ~/.kiro/generatos
+    #[command()]
+    Init,
     /// Display version information
     Version,
 }

@@ -56,6 +56,11 @@ fn init_tracing(debug: bool, trace_agent: Option<&str>) {
             .init();
     }
 }
+
+async fn init() -> Result<()> {
+    todo!()
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
@@ -75,6 +80,9 @@ async fn main() -> Result<()> {
     let local_mode = cli.is_local();
     let global_mode = cli.is_global();
     let (home_dir, home_config) = cli.config()?;
+    if matches!(cli.command, commands::Command::Init) {
+        return init().await;
+    }
     if global_mode {
         debug!(
             "changing working directory to {}",

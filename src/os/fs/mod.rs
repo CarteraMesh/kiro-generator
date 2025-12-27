@@ -20,20 +20,6 @@ pub const ACTIVE_USER_HOME: &str = if cfg!(windows) {
     UNIX_USER_HOME
 };
 
-pub fn expand_tilde(path: &str) -> PathBuf {
-    if path.starts_with('~') {
-        match dirs::home_dir() {
-            Some(mut home) => {
-                home.push(&path[2..]);
-                home
-            }
-            None => PathBuf::from(path),
-        }
-    } else {
-        PathBuf::from(path)
-    }
-}
-
 // Import platform-specific modules
 #[cfg(unix)]
 mod unix;
