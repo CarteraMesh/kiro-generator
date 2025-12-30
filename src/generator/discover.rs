@@ -1,7 +1,6 @@
 use {
     super::*,
-    crate::kdl::{GeneratorConfig, KdlAgent},
-    knuffel::parse,
+    crate::config::{GeneratorConfig, KdlAgent},
     std::{fmt::Display, ops::Deref, path::Path},
 };
 
@@ -10,11 +9,12 @@ pub fn load_inline(fs: &Fs, path: impl AsRef<Path>) -> Result<GeneratorConfig> {
         let content = fs
             .read_to_string_sync(&path)
             .wrap_err_with(|| format!("failed to read path '{}'", path.as_ref().display()))?;
-        match parse(&format!("{}", path.as_ref().display()), &content) {
+
+        match facet_kdl::from_str(&content) {
             Ok(c) => Ok(c),
             Err(e) => {
                 let err_msg = e.to_string();
-                eprintln!("{:?}", miette::Report::new(e));
+                //                eprintln!("{:?}", miette::Report::new(e));
                 Err(eyre!("failed to parse: {err_msg}"))
             }
         }
@@ -96,7 +96,7 @@ pub fn discover(
     let local_path = location.local_kg();
     let global_agents: GeneratorConfig = load_inline(fs, global_path)?;
     let local_agents: GeneratorConfig = load_inline(fs, local_path)?;
-    tracing::debug!("found {} local agents", local_agents.agents.len());
+    tracing::debug!("found {} local agents", local_agents.agent.len());
 
     let local_names = local_agents.names();
     let global_names = global_agents.names();

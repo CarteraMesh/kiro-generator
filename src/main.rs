@@ -1,7 +1,8 @@
 mod agent;
 mod commands;
+mod config;
 mod generator;
-mod kdl;
+// mod kdl;
 mod os;
 pub mod output;
 mod schema;

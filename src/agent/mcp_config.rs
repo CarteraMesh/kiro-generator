@@ -24,10 +24,8 @@ mod tests {
     fn mcp_server_config_serde() {
         let mut config = McpServerConfig::default();
         config.mcp_servers.insert("test".into(), CustomToolConfig {
-            r#type: Default::default(),
             url: String::new(),
             headers: HashMap::new(),
-            oauth: None,
             command: "cmd".into(),
             args: vec![],
             env: HashMap::new(),

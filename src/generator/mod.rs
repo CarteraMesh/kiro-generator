@@ -2,7 +2,7 @@ use {
     crate::{
         Result,
         agent::{Agent, ToolTarget},
-        kdl::KdlAgent,
+        config::KdlAgent,
         os::Fs,
     },
     color_eyre::eyre::{Context, eyre},
@@ -37,15 +37,15 @@ impl AgentResult {
             ToolTarget::Read => self
                 .agent
                 .get_tool_read()
-                .override_path
+                .override_paths()
                 .iter()
                 .cloned()
                 .map(|f| f.to_string())
                 .collect(),
             ToolTarget::Write => self
                 .agent
-                .get_tool_write()
-                .override_path
+                .get_tool_write().overrides
+//                .override_paths()
                 .iter()
                 .cloned()
                 .map(|f| f.to_string())
@@ -53,7 +53,7 @@ impl AgentResult {
             ToolTarget::Shell => self
                 .agent
                 .get_tool_shell()
-                .override_command
+                .override_commands()
                 .iter()
                 .cloned()
                 .map(|f| f.to_string())

@@ -63,21 +63,12 @@ pub struct CustomToolConfigKdl {
 impl From<CustomToolConfigKdl> for CustomToolConfig {
     fn from(value: CustomToolConfigKdl) -> Self {
         let command = value.command.unwrap_or_default();
-        let oauth = value.oauth.map(|o| crate::agent::OAuthConfig {
-            redirect_uri: Some(o.redirect_uri),
-        });
         let url = value.url.unwrap_or_default();
 
         Self {
             url,
-            r#type: if command.is_empty() {
-                crate::agent::TransportType::Stdio
-            } else {
-                crate::agent::TransportType::Http
-            },
             command,
             args: value.args.args,
-            oauth,
             timeout: if value.timeout == 0 {
                 crate::agent::tool_default_timeout()
             } else {

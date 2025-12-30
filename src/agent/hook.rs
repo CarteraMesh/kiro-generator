@@ -60,6 +60,37 @@ pub struct Hook {
 }
 
 impl Hook {
+    pub fn merge(mut self, o: Self) -> Self {
+        if self.cache_ttl_seconds == 0 {
+            self.cache_ttl_seconds = if o.cache_ttl_seconds == 0 {
+                DEFAULT_CACHE_TTL_SECONDS
+            } else {
+                o.cache_ttl_seconds
+            };
+        }
+        if self.command.is_empty() {
+            self.command = o.command;
+        }
+        if self.max_output_size == 0 {
+            self.max_output_size = if o.max_output_size == 0 {
+                DEFAULT_MAX_OUTPUT_SIZE
+            } else {
+                o.max_output_size
+            };
+        }
+        if self.timeout_ms == 0 {
+            self.timeout_ms = if o.timeout_ms == 0 {
+                DEFAULT_TIMEOUT_MS
+            } else {
+                o.timeout_ms
+            };
+        }
+        if self.matcher.is_none() && o.matcher.is_some() {
+            self.matcher = o.matcher;
+        }
+        self
+    }
+
     fn default_timeout_ms() -> u64 {
         DEFAULT_TIMEOUT_MS
     }
