@@ -1,11 +1,13 @@
 use {
     crate::agent::{
-        AwsTool as KiroAwsTool, ExecuteShellTool as KiroShellTool, ReadTool as KiroReadTool,
+        AwsTool as KiroAwsTool,
+        ExecuteShellTool as KiroShellTool,
+        ReadTool as KiroReadTool,
         WriteTool as KiroWriteTool,
     },
     facet::Facet,
     facet_kdl as kdl,
-    std::{collections::HashSet, fmt::Display},
+    std::collections::HashSet,
 };
 
 #[derive(Facet, Debug, PartialEq, Clone, Eq, Hash)]
@@ -115,16 +117,21 @@ pub struct NativeTools {
     pub write: WriteTool,
 }
 
+impl From<NativeToolsDoc> for NativeTools {
+    fn from(value: NativeToolsDoc) -> Self {
+        Self {
+            shell: value.shell.into(),
+            aws: value.aws.into(),
+            read: value.read.into(),
+            write: value.write.into(),
+        }
+    }
+}
+
 #[derive(Facet, Debug, Clone, Default, PartialEq, Eq)]
 pub struct GenericList {
     #[facet(kdl::arguments)]
     pub list: Vec<String>,
-}
-
-impl GenericList {
-    pub fn into_set(self) -> HashSet<String> {
-        HashSet::from_iter(self.list)
-    }
 }
 
 impl From<&'static str> for GenericList {

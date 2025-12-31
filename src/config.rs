@@ -5,14 +5,29 @@ mod mcp;
 mod merge;
 mod native;
 
-use std::{collections::HashSet, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug};
 
-pub use {agent::KdlAgent, hook::HookPart, mcp::CustomToolConfigKdl, native::NativeTools};
+pub use agent::{KdlAgent, KdlAgentDoc};
 
 #[derive(facet::Facet, Default)]
-pub struct GeneratorConfig {
+pub struct GeneratorConfigDoc {
     #[facet(facet_kdl::children, default)]
-    pub agent: Vec<KdlAgent>,
+    pub agent: Vec<KdlAgentDoc>,
+}
+
+#[derive(Default)]
+pub struct GeneratorConfig {
+    pub agent: HashMap<String, KdlAgent>,
+}
+
+impl From<GeneratorConfigDoc> for GeneratorConfig {
+    fn from(value: GeneratorConfigDoc) -> Self {
+        let mut agent: HashMap<String, KdlAgent> = HashMap::with_capacity(value.agent.len());
+        for a in value.agent {
+            agent.insert(a.name.clone(), a.into());
+        }
+        Self { agent }
+    }
 }
 
 impl Debug for GeneratorConfig {
@@ -22,11 +37,7 @@ impl Debug for GeneratorConfig {
 }
 
 impl GeneratorConfig {
-    pub fn names(&self) -> HashSet<String> {
-        self.agent.iter().map(|a| a.name.clone()).collect()
-    }
-
     pub fn get(&self, name: impl AsRef<str>) -> Option<&KdlAgent> {
-        self.agent.iter().find(|a| a.name.eq(name.as_ref()))
+        self.agent.get(name.as_ref())
     }
 }

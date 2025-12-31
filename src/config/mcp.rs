@@ -29,7 +29,7 @@ pub struct RedirectUri {
 }
 
 #[derive(Facet, Clone, Debug)]
-pub struct CustomToolConfigKdl {
+pub struct CustomToolConfigDoc {
     #[facet(kdl::argument)]
     pub name: String,
 
@@ -79,8 +79,8 @@ pub struct Disabled {
     pub value: bool,
 }
 
-impl From<CustomToolConfigKdl> for CustomToolConfig {
-    fn from(value: CustomToolConfigKdl) -> Self {
+impl From<CustomToolConfigDoc> for CustomToolConfig {
+    fn from(value: CustomToolConfigDoc) -> Self {
         let command = value.command.map(|c| c.value).unwrap_or_default();
         let url = value.url.map(|u| u.value).unwrap_or_default();
 
@@ -100,8 +100,8 @@ impl From<CustomToolConfigKdl> for CustomToolConfig {
     }
 }
 
-impl From<&CustomToolConfigKdl> for CustomToolConfig {
-    fn from(value: &CustomToolConfigKdl) -> Self {
+impl From<&CustomToolConfigDoc> for CustomToolConfig {
+    fn from(value: &CustomToolConfigDoc) -> Self {
         value.clone().into()
     }
 }
@@ -113,7 +113,7 @@ mod tests {
     #[derive(Facet, Debug)]
     struct McpDoc {
         #[facet(kdl::child)]
-        mcp: CustomToolConfigKdl,
+        mcp: CustomToolConfigDoc,
     }
 
     #[test]

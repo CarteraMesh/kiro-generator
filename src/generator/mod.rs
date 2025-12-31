@@ -36,34 +36,34 @@ impl AgentResult {
         match target {
             ToolTarget::Read => self
                 .agent
-                .get_tool_read()
-                .override_paths()
+                .native_tool
+                .read
+                .overrides
                 .iter()
-                .cloned()
                 .map(|f| f.to_string())
                 .collect(),
             ToolTarget::Write => self
                 .agent
-                .get_tool_write().overrides
-//                .override_paths()
+                .native_tool
+                .write
+                .overrides
                 .iter()
-                .cloned()
                 .map(|f| f.to_string())
                 .collect(),
             ToolTarget::Shell => self
                 .agent
-                .get_tool_shell()
-                .override_commands()
+                .native_tool
+                .shell
+                .overrides
                 .iter()
-                .cloned()
                 .map(|f| f.to_string())
                 .collect(),
             _ => vec![],
         }
     }
 
-    pub fn resources(&self) -> Vec<String> {
-        self.agent.resources().map(|s| s.to_string()).collect()
+    pub fn resources(&self) -> HashSet<String> {
+        self.agent.resources.clone()
     }
 }
 

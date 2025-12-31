@@ -18,7 +18,7 @@ impl Generator {
         visited.insert(agent.name.clone());
 
         let mut chain = Vec::new();
-        for parent_name in agent.inherits().iter() {
+        for parent_name in agent.inherits.iter() {
             let parent = self
                 .resolved
                 .agents

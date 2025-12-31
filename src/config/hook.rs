@@ -67,21 +67,6 @@ macro_rules! define_hook_doc {
     };
 }
 
-macro_rules! define_hook {
-    ($name:ident) => {
-        #[derive(Default, Clone, Debug, PartialEq, Eq)]
-        pub struct $name {
-            #[facet(kdl::argument)]
-            pub name: String,
-            command: String,
-            timeout_ms: u64,
-            max_output_size: u64,
-            cache_ttl_seconds: u64,
-            matcher: Option<String>,
-        }
-    };
-}
-
 #[derive(Facet, Clone, Default, Debug, PartialEq, Eq)]
 #[facet(default)]
 struct GenericValue {
@@ -157,31 +142,45 @@ impl From<HookDoc> for HookPart {
         }
     }
 }
+
 impl HookPart {
+    pub fn hooks(&self, trigger: &HookTrigger) -> Vec<Hook> {
+        match trigger {
+            HookTrigger::AgentSpawn => self.agent_spawn.values().cloned().collect(),
+            HookTrigger::UserPromptSubmit => self.user_prompt_submit.values().cloned().collect(),
+            HookTrigger::PreToolUse => self.pre_tool_use.values().cloned().collect(),
+            HookTrigger::PostToolUse => self.post_tool_use.values().cloned().collect(),
+            HookTrigger::Stop => self.stop.values().cloned().collect(),
+        }
+    }
+
     pub fn merge(mut self, other: Self) -> Self {
-        match (self.agent_spawn.is_empty(), other.agent_spawn.is_empty()) {
-            (false, false) => {
-                let mut hooks = HashMap::with_capacity(self.agent_spawn.len());
-                for (k, h) in self.agent_spawn {
-                    if let Some(o) = other.agent_spawn.get(&k) {
-                        hooks.insert(k.to_string(), h.merge(o.clone()));
-                    } else {
-                        hooks.insert(k, h);
-                    }
-                }
-                self.agent_spawn = hooks;
-                for o in other.agent_spawn.keys() {
-                    if !self.agent_spawn.contains_key(o) {
-                        self.agent_spawn
-                            .insert(o.to_string(), other.agent_spawn.get(o).unwrap().clone());
-                    }
-                }
-            }
-            (true, false) => self.agent_spawn = other.agent_spawn,
-            _ => {}
-        };
+        self.agent_spawn = merge_hooks(self.agent_spawn, other.agent_spawn);
+        self.user_prompt_submit = merge_hooks(self.user_prompt_submit, other.user_prompt_submit);
+        self.pre_tool_use = merge_hooks(self.pre_tool_use, other.pre_tool_use);
+        self.post_tool_use = merge_hooks(self.post_tool_use, other.post_tool_use);
+        self.stop = merge_hooks(self.stop, other.stop);
         self
     }
+}
+
+fn merge_hooks(
+    mut base: HashMap<String, Hook>,
+    other: HashMap<String, Hook>,
+) -> HashMap<String, Hook> {
+    if base.is_empty() {
+        return other;
+    }
+    if other.is_empty() {
+        return base;
+    }
+
+    for (key, other_hook) in other {
+        base.entry(key)
+            .and_modify(|h| *h = h.clone().merge(other_hook.clone()))
+            .or_insert(other_hook);
+    }
+    base
 }
 
 // #[cfg(test)]

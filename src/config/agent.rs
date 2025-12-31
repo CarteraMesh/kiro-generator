@@ -1,13 +1,10 @@
 use {
     super::{
-        hook::HookDoc,
-        mcp::CustomToolConfigKdl,
-        native::{AwsTool, ExecuteShellTool, NativeTools, NativeToolsDoc, ReadTool, WriteTool},
+        hook::{HookDoc, HookPart},
+        mcp::CustomToolConfigDoc,
+        native::{NativeTools, NativeToolsDoc},
     },
-    crate::agent::{
-        CustomToolConfig, OriginalToolName,
-        hook::{Hook, HookTrigger},
-    },
+    crate::agent::{CustomToolConfig, OriginalToolName},
     color_eyre::eyre::WrapErr,
     facet::Facet,
     facet_kdl as kdl,
@@ -78,6 +75,7 @@ struct Json {
 }
 
 impl ToolSetting {
+    #[allow(dead_code)]
     fn to_value(&self) -> crate::Result<(String, serde_json::Value)> {
         let v: serde_json::Value = serde_json::from_str(&self.json.value)
             .wrap_err_with(|| format!("Failed to parse JSON for tool-setting '{}'", self.name))?;
@@ -94,7 +92,27 @@ impl ToolSetting {
     }
 }
 
+#[derive(Clone, Default)]
+pub struct KdlAgent {
+    pub name: String,
+    pub template: Option<bool>,
+    pub description: Option<String>,
+    pub inherits: HashSet<String>,
+    pub prompt: Option<String>,
+    pub resources: HashSet<String>,
+    pub include_mcp_json: Option<bool>,
+    pub tools: HashSet<String>,
+    pub allowed_tools: HashSet<String>,
+    pub model: Option<String>,
+    pub hook: HookPart,
+    pub mcp: HashMap<String, CustomToolConfig>,
+    pub alias: HashMap<OriginalToolName, String>,
+    pub native_tool: NativeTools,
+    pub tool_setting: Vec<ToolSetting>,
+}
+
 #[derive(Facet, Clone, Default)]
+#[facet(rename = "kabel-case", default)]
 pub struct KdlAgentDoc {
     #[facet(kdl::argument)]
     pub name: String,
@@ -108,8 +126,8 @@ pub struct KdlAgentDoc {
     pub prompt: Option<Prompt>,
     #[facet(kdl::children, default)]
     pub(super) resources: Vec<Resource>,
-    #[facet(kdl::child, default)]
-    pub include_mcp_json: Option<IncludeMcpJson>,
+    #[facet(kdl::property, default)]
+    pub include_mcp_json: Option<bool>,
     #[facet(kdl::child, default)]
     pub(super) tools: Option<Tools>,
     #[facet(kdl::child, default)]
@@ -119,11 +137,11 @@ pub struct KdlAgentDoc {
     #[facet(kdl::child, default)]
     pub(super) hook: Option<HookDoc>,
     #[facet(kdl::children, default)]
-    pub(super) mcp: Vec<CustomToolConfigKdl>,
+    pub(super) mcp: Vec<CustomToolConfigDoc>,
     #[facet(kdl::children, default)]
     pub(super) alias: Vec<ToolAliasKdl>,
     #[facet(kdl::child, default)]
-    pub native_tool: Option<NativeToolsDoc>,
+    pub native_tool: NativeToolsDoc,
     #[facet(kdl::children, default)]
     pub(super) tool_setting: Vec<ToolSetting>,
 }
@@ -135,19 +153,13 @@ pub struct Description {
 }
 
 #[derive(Facet, Clone, Default, Debug)]
-struct Prompt {
+pub struct Prompt {
     #[facet(kdl::argument)]
     value: String,
 }
 
 #[derive(Facet, Clone, Debug)]
-struct IncludeMcpJson {
-    #[facet(kdl::argument)]
-    value: bool,
-}
-
-#[derive(Facet, Clone, Debug)]
-struct Model {
+pub struct Model {
     #[facet(kdl::argument)]
     value: String,
 }
@@ -164,7 +176,41 @@ impl Display for KdlAgent {
     }
 }
 
+impl From<KdlAgentDoc> for KdlAgent {
+    fn from(value: KdlAgentDoc) -> Self {
+        Self {
+            name: value.name.clone(),
+            description: value.description.as_ref().map(|f| f.value.clone()),
+            prompt: value.prompt.as_ref().map(|f| f.value.clone()),
+            alias: value.tool_aliases(),
+            allowed_tools: value.allowed_tools(),
+            inherits: value.inherits(),
+            template: value.template,
+            include_mcp_json: value.include_mcp_json,
+            hook: value.hooks(),
+            resources: value.resources(),
+            model: value.model.as_ref().map(|f| f.value.clone()),
+            mcp: value.mcp_servers(),
+            tools: value.tools(),
+            tool_setting: Default::default(), // TODO use facet::Value
+            native_tool: value.native_tool.into(),
+        }
+    }
+}
+
 impl KdlAgent {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            ..Default::default()
+        }
+    }
+
+    pub fn is_template(&self) -> bool {
+        self.template.is_some_and(|f| f)
+    }
+}
+impl KdlAgentDoc {
     pub fn prompt(&self) -> String {
         self.prompt.clone().unwrap_or_default().value
     }
@@ -184,41 +230,6 @@ impl KdlAgent {
         self.template.is_some_and(|f| f)
     }
 
-    pub fn include_mcp_json(&self) -> bool {
-        self.include_mcp_json
-            .as_ref()
-            .map(|i| i.value)
-            .unwrap_or(false)
-    }
-
-    pub fn get_tool_aws(&self) -> AwsTool {
-        self.native_tool
-            .as_ref()
-            .and_then(|n| n.aws.clone())
-            .unwrap_or_default()
-    }
-
-    pub fn get_tool_read(&self) -> ReadTool {
-        self.native_tool
-            .as_ref()
-            .and_then(|n| n.read.clone())
-            .unwrap_or_default()
-    }
-
-    pub fn get_tool_write(&self) -> WriteTool {
-        self.native_tool
-            .as_ref()
-            .and_then(|n| n.write.clone())
-            .unwrap_or_default()
-    }
-
-    pub fn get_tool_shell(&self) -> ExecuteShellTool {
-        self.native_tool
-            .as_ref()
-            .and_then(|n| n.shell.clone())
-            .unwrap_or_default()
-    }
-
     pub fn tool_aliases(&self) -> HashMap<OriginalToolName, String> {
         self.alias
             .iter()
@@ -226,11 +237,8 @@ impl KdlAgent {
             .collect()
     }
 
-    pub fn hooks(&self) -> HashMap<HookTrigger, Vec<Hook>> {
-        match &self.hook {
-            None => HashMap::new(),
-            Some(h) => h.triggers(),
-        }
+    pub fn hooks(&self) -> HookPart {
+        HookPart::from(self.hook.clone().unwrap_or_default())
     }
 
     pub fn allowed_tools(&self) -> HashSet<String> {
@@ -251,8 +259,8 @@ impl KdlAgent {
         HashSet::from_iter(self.inherits.parents.clone())
     }
 
-    pub fn resources(&self) -> impl Iterator<Item = &str> {
-        self.resources.iter().map(|r| r.location.as_str())
+    pub fn resources(&self) -> HashSet<String> {
+        HashSet::from_iter(self.resources.iter().map(|r| r.location.clone()))
     }
 
     pub fn mcp_servers(&self) -> HashMap<String, CustomToolConfig> {
@@ -263,18 +271,17 @@ impl KdlAgent {
     }
 
     pub fn extra_tool_settings(&self) -> crate::Result<HashMap<String, serde_json::Value>> {
-        let mut result = HashMap::new();
-        for setting in &self.tool_setting {
-            let (name, value) = setting.to_value()?;
-            if result.contains_key(&name) {
-                return Err(color_eyre::eyre::eyre!(
-                    "[{self}] - Duplicate tool-setting '{}' found. Each tool-setting name must be \
-                     unique.",
-                    name
-                ));
-            }
-            result.insert(name, value);
-        }
-        Ok(result)
+        Ok(HashMap::new())
+        // for setting in &self.tool_setting {
+        //     let (name, value) = setting.to_value()?;
+        //     if result.contains_key(&name) {
+        //         return Err(color_eyre::eyre::eyre!(
+        //             "[{self}] - Duplicate tool-setting '{}' found. Each
+        // tool-setting name must be \              unique.",
+        //             name
+        //         ));
+        //     }
+        //     result.insert(name, value);
+        // }
     }
 }

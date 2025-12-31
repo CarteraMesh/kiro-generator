@@ -2,38 +2,26 @@ use super::*;
 
 impl KdlAgent {
     pub fn merge(mut self, other: KdlAgent) -> Self {
-        Self::default()
-        // // Child wins for explicit values
-        // self.include_mcp_json =
-        // self.include_mcp_json.or(other.include_mcp_json);
-        // self.template = self.template.or(other.template);
-        // self.description = self.description.or(other.description);
-        // self.prompt = self.prompt.or(other.prompt);
-        // self.model = self.model.or(other.model);
+        // Child wins for explicit values
+        self.include_mcp_json = self.include_mcp_json.or(other.include_mcp_json);
+        self.template = self.template.or(other.template);
+        self.description = self.description.or(other.description);
+        self.prompt = self.prompt.or(other.prompt);
+        self.model = self.model.or(other.model);
 
-        // // Collections are extended (merged)
-        // self.resources.extend(other.resources);
-        // self.tools.tools.extend(other.tools.tools);
-        // self.allowed_tools
-        //     .allowed
-        //     .extend(other.allowed_tools.allowed);
-        // self.tool_aliases.extend(other.tool_aliases);
-        // self.mcp.extend(other.mcp);
-        // self.inherits.parents.extend(other.inherits.parents);
-        // self.tool_settings.extend(other.tool_settings);
+        // Collections are extended (merged)
+        self.resources.extend(other.resources);
+        self.tools.extend(other.tools);
+        self.allowed_tools.extend(other.allowed_tools);
+        self.alias.extend(other.alias);
+        self.mcp.extend(other.mcp);
+        self.inherits.extend(other.inherits);
+        self.tool_setting.extend(other.tool_setting);
 
-        // // Hooks are deep merged
-        // self.hook = match (self.hook, other.hook) {
-        //     (None, Some(h)) => Some(h),
-        //     (Some(a), Some(b)) => Some(a.merge(b)),
-        //     (Some(a), None) => Some(a),
-        //     (None, None) => None,
-        // };
+        self.hook = self.hook.merge(other.hook);
+        self.native_tool = self.native_tool.merge(other.native_tool);
 
-        // // Native tools are deep merged
-        // self.native_tool = self.native_tool.merge(other.native_tool);
-
-        // self
+        self
     }
 }
 

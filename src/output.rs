@@ -129,7 +129,7 @@ impl OutputFormat {
 
         // MCP servers (only enabled ones)
         let mut servers = Vec::new();
-        for (k, v) in &result.agent.mcp_servers() {
+        for (k, v) in &result.agent.mcp {
             if !v.disabled {
                 servers.push(k.clone());
             }
@@ -140,14 +140,14 @@ impl OutputFormat {
         // Allowed tools
         let mut allowed_tools: Vec<String> = result
             .agent
-            .allowed_tools()
+            .allowed_tools
             .iter()
             .filter(|t| !t.is_empty())
             .cloned()
             .collect();
         allowed_tools.sort();
         let mut enabled_tools = Vec::with_capacity(allowed_tools.len());
-        let mcps = result.agent.mcp_servers();
+        let mcps = &result.agent.mcp;
         for t in allowed_tools {
             if t.len() < 2 {
                 continue;
@@ -179,7 +179,7 @@ impl OutputFormat {
         }
 
         // resources
-        if let Some(resources) = serialize_yaml("", &result.resources()) {
+        if let Some(resources) = serialize_yaml("", &Vec::from_iter(result.resources())) {
             row.add_cell(resources);
         }
 

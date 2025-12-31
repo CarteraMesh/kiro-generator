@@ -58,6 +58,3 @@ strip = false          # Keep symbols for better backtraces
 debug = 1              # Line numbers only (smaller than full debug=2)
 lto = "thin"           # Faster builds than "fat", still good optimization
 codegen-units = 16     # Default, balances compile time vs optimization
-
-[lints.rust]
-unused_imports = "allow"
