@@ -1,4 +1,5 @@
 use {
+    super::{GenericItem, split_newline},
     crate::agent::{
         AwsTool as KiroAwsTool,
         ExecuteShellTool as KiroShellTool,
@@ -10,11 +11,6 @@ use {
     std::collections::HashSet,
 };
 
-#[derive(Facet, Debug, PartialEq, Clone, Eq, Hash)]
-pub struct GenericListItem {
-    #[facet(kdl::argument)]
-    item: String,
-}
 macro_rules! define_tool {
     ($name:ident) => {
         #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -30,6 +26,7 @@ macro_rules! define_tool {
             pub fn merge(mut self, other: Self) -> Self {
                 self.allows.extend(other.allows);
                 self.denies.extend(other.denies);
+                self.overrides.extend(other.overrides);
                 self.disable_auto_readonly =
                     self.disable_auto_readonly.or(other.disable_auto_readonly);
                 self.deny_by_default = self.deny_by_default.or(other.deny_by_default);
@@ -45,11 +42,11 @@ macro_rules! define_kdl_doc {
         #[facet(default, rename_all = "kebab-case")]
         pub struct $name {
             #[facet(default, kdl::children)]
-            pub allows: Vec<GenericListItem>,
+            pub(super) allows: Vec<GenericItem>,
             #[facet(default, kdl::children)]
-            pub denies: Vec<GenericListItem>,
+            pub(super) denies: Vec<GenericItem>,
             #[facet(default, kdl::children)]
-            pub overrides: Vec<GenericListItem>,
+            pub(super) overrides: Vec<GenericItem>,
             #[facet(default, kdl::property)]
             pub deny_by_default: Option<bool>,
             #[facet(default, kdl::property)]
@@ -87,17 +84,8 @@ define_tool_into!(AwsToolDoc, AwsTool);
 define_tool_into!(WriteToolDoc, WriteTool);
 define_tool_into!(ReadToolDoc, ReadTool);
 
-fn split_newline(list: Vec<GenericListItem>) -> HashSet<String> {
-    let values: Vec<&str> = list.iter().flat_map(|f| f.item.split("\n")).collect();
-    let mut combined: Vec<String> = vec![];
-    for v in values {
-        combined.push(v.to_string());
-    }
-    HashSet::from_iter(combined)
-}
-
 #[derive(Facet, Default, Clone, Debug, PartialEq, Eq)]
-#[facet(deny_unknown_fields)]
+#[facet(default, deny_unknown_fields)]
 pub struct NativeToolsDoc {
     #[facet(default, kdl::child)]
     pub shell: ExecuteShellToolDoc,
@@ -166,7 +154,7 @@ impl From<&NativeTools> for KiroAwsTool {
         KiroAwsTool {
             allowed_services: aws.allows.clone(),
             denied_services: aws.denies.clone(),
-            auto_allow_readonly: aws.disable_auto_readonly.unwrap_or(true),
+            auto_allow_readonly: !aws.disable_auto_readonly.unwrap_or(false),
         }
     }
 }
@@ -174,24 +162,24 @@ impl From<&NativeTools> for KiroAwsTool {
 impl From<&NativeTools> for KiroWriteTool {
     fn from(value: &NativeTools) -> Self {
         let write = &value.write;
-        let mut allow: HashSet<String> = write.allows.clone();
-        let mut deny: HashSet<String> = write.denies.clone();
+        let mut allows: HashSet<String> = write.allows.clone();
+        let mut denies: HashSet<String> = write.denies.clone();
         if !write.overrides.is_empty() {
             tracing::trace!(
                 "Override/Forcing write: {:?}",
                 write.overrides.iter().collect::<Vec<_>>()
             );
             for cmd in write.overrides.iter() {
-                allow.insert(cmd.clone());
-                if deny.remove(cmd) {
-                    tracing::trace!("Removed from deny: {cmd}");
+                allows.insert(cmd.clone());
+                if denies.remove(cmd) {
+                    tracing::trace!("Removed from denies: {cmd}");
                 }
             }
         }
 
         Self {
-            allowed_paths: allow,
-            denied_paths: deny,
+            allowed_paths: allows,
+            denied_paths: denies,
         }
     }
 }
@@ -199,24 +187,24 @@ impl From<&NativeTools> for KiroWriteTool {
 impl From<&NativeTools> for KiroReadTool {
     fn from(value: &NativeTools) -> Self {
         let read = &value.read;
-        let mut allow: HashSet<String> = read.allows.clone();
-        let mut deny: HashSet<String> = read.denies.clone();
+        let mut allows: HashSet<String> = read.allows.clone();
+        let mut denies: HashSet<String> = read.denies.clone();
         if !read.overrides.is_empty() {
             tracing::trace!(
                 "Override/Forcing write: {:?}",
                 read.overrides.iter().collect::<Vec<_>>()
             );
             for cmd in read.overrides.iter() {
-                allow.insert(cmd.clone());
-                if deny.remove(cmd) {
-                    tracing::trace!("Removed from deny: {cmd}");
+                allows.insert(cmd.clone());
+                if denies.remove(cmd) {
+                    tracing::trace!("Removed from denies: {cmd}");
                 }
             }
         }
 
         Self {
-            allowed_paths: allow,
-            denied_paths: deny,
+            allowed_paths: allows,
+            denied_paths: denies,
         }
     }
 }
@@ -224,8 +212,8 @@ impl From<&NativeTools> for KiroReadTool {
 impl From<&NativeTools> for KiroShellTool {
     fn from(value: &NativeTools) -> Self {
         let shell = &value.shell;
-        let mut allow: HashSet<String> = shell.allows.clone();
-        let mut deny: HashSet<String> = shell.denies.clone();
+        let mut allows: HashSet<String> = shell.allows.clone();
+        let mut denies: HashSet<String> = shell.denies.clone();
 
         if !shell.overrides.is_empty() {
             tracing::trace!(
@@ -233,303 +221,324 @@ impl From<&NativeTools> for KiroShellTool {
                 shell.overrides.iter().collect::<Vec<_>>()
             );
             for cmd in shell.overrides.iter() {
-                allow.insert(cmd.clone());
-                if deny.remove(cmd) {
-                    tracing::trace!("Removed command from deny: {cmd}");
+                allows.insert(cmd.clone());
+                if denies.remove(cmd) {
+                    tracing::trace!("Removed command from denies: {cmd}");
                 }
             }
         }
         Self {
-            allowed_commands: allow,
-            denied_commands: deny,
+            allowed_commands: allows,
+            denied_commands: denies,
             deny_by_default: shell.deny_by_default.unwrap_or(false),
             auto_allow_readonly: shell.disable_auto_readonly.unwrap_or(true),
         }
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use {super::*, crate::Result};
+#[cfg(test)]
+mod tests {
+    use {
+        super::*,
+        crate::{
+            Result,
+            config::{ConfigResult, kdl_parse},
+        },
+        std::fmt::Display,
+    };
+    fn into_set<T: Display>(v: Vec<T>) -> HashSet<String> {
+        HashSet::from_iter(v.into_iter().map(|t| t.to_string()))
+    }
+    #[test_log::test]
+    fn parse_shell_tool() -> ConfigResult<()> {
+        let kdl = r#"
+            shell deny-by-default=#true disable-auto-readonly=#false {
+                allow """
+                ls .*
+                git status
+                """
+                deny "rm -rf /"
+                override "git push"
+            }
+        "#;
 
-//     #[derive(Facet, Debug)]
-//     struct NativeToolsDoc {
-//         #[facet(kdl::child)]
-//         native: NativeTools,
-//     }
+        let doc: NativeToolsDoc = kdl_parse(kdl)?;
+        let doc = NativeTools::from(doc);
+        let shell = doc.shell;
+        assert_eq!(shell.allows.len(), 2);
+        assert_eq!(shell.denies.len(), 1);
+        assert!(shell.deny_by_default.unwrap_or_default());
+        assert!(!shell.disable_auto_readonly.unwrap_or_default());
+        assert_eq!(shell.overrides.len(), 1);
+        Ok(())
+    }
 
-//     #[test_log::test]
-//     fn parse_shell_tool() {
-//         let kdl = r#"native {
-//             shell deny_by_default=#true disable_auto_readonly=#false {
-//                 allow "ls .*" "git status"
-//                 deny "rm -rf /"
-//                 override "git push"
-//             }
-//         }"#;
+    #[test_log::test]
+    fn parse_aws_tool() -> ConfigResult<()> {
+        let kdl = r#"
+            aws disable-auto-readonly=#true {
+                allow "ec2"
+                allow "s3"
+                deny "iam"
+            }
+        "#;
 
-//         let doc: NativeToolsDoc = facet_kdl::from_str(kdl).unwrap();
-//         let shell = doc.native.shell.unwrap();
-//         assert_eq!(shell.allow.unwrap().list.len(), 2);
-//         assert_eq!(shell.deny.unwrap().list.len(), 1);
-//         assert!(shell.deny_by_default.unwrap());
-//         assert!(!shell.disable_auto_readonly.unwrap());
-//         assert_eq!(shell.r#override.len(), 1);
-//     }
+        let doc: NativeToolsDoc = kdl_parse(kdl)?;
+        let aws = NativeTools::from(doc).aws;
+        assert!(aws.disable_auto_readonly.is_some());
+        assert!(aws.disable_auto_readonly.unwrap_or_default());
+        assert_eq!(aws.allows.len(), 2);
+        assert_eq!(aws.denies.len(), 1);
+        Ok(())
+    }
 
-//     #[test_log::test]
-//     fn parse_aws_tool() {
-//         let kdl = r#"native {
-//             aws disable_auto_readonly=#true {
-//                 allow "ec2" "s3"
-//                 deny "iam"
-//             }
-//         }"#;
+    #[test_log::test]
+    fn parse_read_write_tools() -> ConfigResult<()> {
+        let kdl = r#"
+            read {
+                allow """
+                *.rs
+                *.toml
+                """
+                deny "/etc/*"
+                override "/etc/hosts"
+            }
+            write {
+                allow "*.txt"
+                deny "/tmp/*"
+                override "/tmp/allowed"
+            }
+        "#;
 
-//         let doc: NativeToolsDoc = facet_kdl::from_str(kdl).unwrap();
-//         let aws = doc.native.aws.unwrap();
-//         assert!(aws.disable_auto_readonly.unwrap());
-//         assert_eq!(aws.allow.unwrap().list.len(), 2);
-//         assert_eq!(aws.deny.unwrap().list.len(), 1);
-//     }
+        let doc: NativeToolsDoc = kdl_parse(kdl)?;
+        let doc = NativeTools::from(doc);
+        assert_eq!(doc.read.allows.len(), 2);
+        assert_eq!(doc.write.allows.len(), 1);
+        Ok(())
+    }
 
-//     #[test_log::test]
-//     fn parse_read_write_tools() {
-//         let kdl = r#"native {
-//             read {
-//                 allow "*.rs" "*.toml"
-//                 deny "/etc/*"
-//                 override "/etc/hosts"
-//             }
-//             write {
-//                 allow "*.txt"
-//                 deny "/tmp/*"
-//                 override "/tmp/allowed"
-//             }
-//         }"#;
+    #[test_log::test]
+    pub fn test_native_merge_empty() -> Result<()> {
+        let child = NativeTools::default();
+        let parent = NativeTools::default();
+        let merged = child.merge(parent);
 
-//         let doc: NativeToolsDoc = facet_kdl::from_str(kdl).unwrap();
-//         assert_eq!(doc.native.read.unwrap().allow.unwrap().list.len(), 2);
-//         assert_eq!(doc.native.write.unwrap().allow.unwrap().list.len(), 1);
-//     }
+        assert_eq!(merged, NativeTools::default());
+        Ok(())
+    }
 
-//     #[test_log::test]
-//     pub fn test_native_merge_empty() -> Result<()> {
-//         let child = NativeTools::default();
-//         let parent = NativeTools::default();
-//         let merged = child.merge(parent);
+    #[test_log::test]
+    pub fn test_native_merge_empty_child() -> Result<()> {
+        let child = NativeTools::default();
+        let parent = NativeTools {
+            aws: AwsTool {
+                disable_auto_readonly: None,
+                deny_by_default: None,
+                overrides: Default::default(),
+                allows: into_set(vec!["ec2"]),
+                denies: into_set(vec!["iam"]),
+            },
+            shell: ExecuteShellTool {
+                allows: into_set(vec!["ls .*"]),
+                denies: into_set(vec!["git push"]),
+                overrides: into_set(vec!["rm -rf /"]),
+                deny_by_default: Some(true),
+                disable_auto_readonly: Some(false),
+            },
+            read: ReadTool {
+                allows: into_set(vec!["ls .*"]),
+                denies: into_set(vec!["git push"]),
+                overrides: into_set(vec!["rm -rf /"]),
+                ..Default::default()
+            },
+            write: WriteTool {
+                allows: into_set(vec!["ls .*"]),
+                denies: into_set(vec!["git push"]),
+                overrides: into_set(vec!["rm -rf /"]),
+                ..Default::default()
+            },
+        };
 
-//         assert_eq!(merged, NativeTools::default());
-//         Ok(())
-//     }
+        let merged = child.merge(parent.clone());
+        assert_eq!(merged.aws, parent.aws);
+        assert_eq!(merged.shell, parent.shell);
+        assert_eq!(merged.read, parent.read);
+        assert_eq!(merged.write, parent.write);
+        Ok(())
+    }
 
-//     #[test_log::test]
-//     pub fn test_native_merge_empty_child() -> Result<()> {
-//         let child = NativeTools::default();
-//         let parent = NativeTools {
-//             aws: Some(AwsTool {
-//                 disable_auto_readonly: None,
-//                 allow: Some(vec!["ec2"].into_iter().collect()),
-//                 deny: Some(vec!["iam"].into_iter().collect()),
-//             }),
-//             shell: Some(ExecuteShellTool {
-//                 allow: Some(vec!["ls .*"].into_iter().collect()),
-//                 deny: Some(vec!["git push"].into_iter().collect()),
-//                 r#override: vec![Override::from("rm -rf /")],
-//                 deny_by_default: Some(true),
-//                 disable_auto_readonly: Some(false),
-//             }),
-//             read: Some(ReadTool {
-//                 allow: Some(vec!["ls .*"].into_iter().collect()),
-//                 deny: Some(vec!["git push"].into_iter().collect()),
-//                 r#override: vec![Override::from("rm -rf /")],
-//             }),
-//             write: Some(WriteTool {
-//                 allow: Some(vec!["ls .*"].into_iter().collect()),
-//                 deny: Some(vec!["git push"].into_iter().collect()),
-//                 overrides: vec![Override::from("rm -rf /")],
-//             }),
-//         };
+    #[test_log::test]
+    pub fn test_native_merge_child_parent() -> Result<()> {
+        let child = NativeTools {
+            aws: AwsTool {
+                disable_auto_readonly: Some(true),
+                allows: into_set(vec!["ec2"]),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
-//         let merged = child.merge(parent.clone());
-//         assert_eq!(merged.aws, parent.aws);
-//         assert_eq!(merged.shell, parent.shell);
-//         assert_eq!(merged.read, parent.read);
-//         assert_eq!(merged.write, parent.write);
-//         Ok(())
-//     }
+        let parent = NativeTools {
+            aws: AwsTool {
+                allows: into_set(vec!["ec2"]),
+                denies: into_set(vec!["iam"]),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
-//     #[test_log::test]
-//     pub fn test_native_merge_child_parent() -> Result<()> {
-//         let child = NativeTools {
-//             aws: Some(AwsTool {
-//                 disable_auto_readonly: Some(true),
-//                 allow: Some(vec!["ec2"].into_iter().collect()),
-//                 deny: None,
-//             }),
-//             ..Default::default()
-//         };
+        let merged = child.merge(parent);
+        let aws = merged.aws;
+        assert!(aws.disable_auto_readonly.unwrap_or_default());
+        // Should have deduplicated ec2
+        assert_eq!(aws.allows.len(), 1);
+        assert_eq!(aws.denies, into_set(vec!["iam".to_string()]));
+        Ok(())
+    }
 
-//         let parent = NativeTools {
-//             aws: Some(AwsTool {
-//                 disable_auto_readonly: None,
-//                 allow: Some(vec!["ec2"].into_iter().collect()),
-//                 deny: Some(vec!["iam"].into_iter().collect()),
-//             }),
-//             ..Default::default()
-//         };
+    #[test_log::test]
+    pub fn test_native_merge_shell() -> Result<()> {
+        let child = ExecuteShellTool::default();
+        let parent = ExecuteShellTool {
+            deny_by_default: Some(false),
+            disable_auto_readonly: Some(false),
+            ..Default::default()
+        };
 
-//         let merged = child.merge(parent);
-//         let aws = merged.aws.unwrap();
-//         assert!(aws.disable_auto_readonly.unwrap());
-//         // Should have deduplicated ec2
-//         assert_eq!(aws.allow.unwrap().into_set().len(), 1);
-//         assert_eq!(
-//             aws.deny.unwrap().into_set(),
-//             HashSet::from_iter(vec!["iam".to_string()])
-//         );
-//         Ok(())
-//     }
+        let merged = child.clone().merge(parent);
+        assert!(!merged.deny_by_default.unwrap_or_default());
+        assert!(!merged.disable_auto_readonly.unwrap_or_default());
 
-//     #[test_log::test]
-//     pub fn test_native_merge_shell() -> Result<()> {
-//         let child = ExecuteShellTool::default();
-//         let parent = ExecuteShellTool {
-//             deny_by_default: Some(false),
-//             disable_auto_readonly: Some(false),
-//             ..Default::default()
-//         };
+        let parent = ExecuteShellTool {
+            deny_by_default: Some(true),
+            disable_auto_readonly: Some(true),
+            ..Default::default()
+        };
+        let merged = child.clone().merge(parent);
+        assert!(merged.deny_by_default.unwrap_or_default());
+        assert!(merged.disable_auto_readonly.unwrap_or_default());
 
-//         let merged = child.clone().merge(parent);
-//         assert!(!merged.deny_by_default.unwrap());
-//         assert!(!merged.disable_auto_readonly.unwrap());
+        let child = ExecuteShellTool {
+            deny_by_default: Some(false),
+            disable_auto_readonly: Some(false),
+            ..Default::default()
+        };
+        let parent = ExecuteShellTool {
+            deny_by_default: Some(true),
+            disable_auto_readonly: Some(true),
+            ..Default::default()
+        };
+        let merged = child.merge(parent);
+        assert!(!merged.deny_by_default.unwrap_or_default());
+        assert!(!merged.disable_auto_readonly.unwrap_or_default());
+        Ok(())
+    }
 
-//         let parent = ExecuteShellTool {
-//             deny_by_default: Some(true),
-//             disable_auto_readonly: Some(true),
-//             ..Default::default()
-//         };
-//         let merged = child.clone().merge(parent);
-//         assert!(merged.deny_by_default.unwrap());
-//         assert!(merged.disable_auto_readonly.unwrap());
+    #[test_log::test]
+    pub fn test_native_aws_kiro() -> Result<()> {
+        let a = NativeTools::default();
+        let kiro = KiroAwsTool::from(&a);
+        assert!(kiro.auto_allow_readonly);
+        assert!(kiro.allowed_services.is_empty());
+        assert!(kiro.denied_services.is_empty());
 
-//         let child = ExecuteShellTool {
-//             deny_by_default: Some(false),
-//             disable_auto_readonly: Some(false),
-//             ..Default::default()
-//         };
-//         let parent = ExecuteShellTool {
-//             deny_by_default: Some(true),
-//             disable_auto_readonly: Some(true),
-//             ..Default::default()
-//         };
-//         let merged = child.merge(parent);
-//         assert!(!merged.deny_by_default.unwrap());
-//         assert!(!merged.disable_auto_readonly.unwrap());
-//         Ok(())
-//     }
+        let a = NativeTools {
+            aws: AwsTool {
+                disable_auto_readonly: Some(true),
+                allows: into_set(vec!["blah"]),
+                denies: into_set(vec!["blahblah"]),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
-//     #[test_log::test]
-//     pub fn test_native_aws_kiro() -> Result<()> {
-//         let a = NativeTools::default();
-//         let kiro = KiroAwsTool::from(&a);
-//         assert!(kiro.auto_allow_readonly);
-//         assert!(kiro.allowed_services.is_empty());
-//         assert!(kiro.denied_services.is_empty());
+        let kiro = KiroAwsTool::from(&a);
+        assert!(!kiro.auto_allow_readonly);
+        assert!(kiro.allowed_services.contains("blah"));
+        assert!(kiro.denied_services.contains("blahblah"));
+        assert_eq!(kiro.allowed_services.len() + kiro.denied_services.len(), 2);
+        Ok(())
+    }
 
-//         let a = NativeTools {
-//             aws: Some(AwsTool {
-//                 disable_auto_readonly: Some(true),
-//                 allow: Some("blah".into()),
-//                 deny: Some("blahblah".into()),
-//             }),
-//             ..Default::default()
-//         };
+    #[test_log::test]
+    pub fn test_native_shell_kiro() -> Result<()> {
+        let a = NativeTools::default();
+        let kiro = KiroShellTool::from(&a);
+        assert!(kiro.auto_allow_readonly);
+        assert!(kiro.allowed_commands.is_empty());
+        assert!(kiro.denied_commands.is_empty());
 
-//         let kiro = KiroAwsTool::from(&a);
-//         assert!(!kiro.auto_allow_readonly);
-//         assert!(kiro.allowed_services.contains("blah"));
-//         assert!(kiro.denied_services.contains("blahblah"));
-//         assert_eq!(kiro.allowed_services.len() + kiro.denied_services.len(),
-// 2);         Ok(())
-//     }
+        let a = NativeTools {
+            shell: ExecuteShellTool {
+                allows: into_set(vec!["ls"]),
+                denies: into_set(vec!["rm"]),
+                deny_by_default: None,
+                disable_auto_readonly: None,
+                overrides: into_set(vec!["rm"]),
+            },
+            ..Default::default()
+        };
+        let kiro = KiroShellTool::from(&a);
+        assert!(kiro.auto_allow_readonly);
+        assert_eq!(kiro.allowed_commands.len(), 2);
+        assert_eq!(
+            kiro.allowed_commands,
+            into_set(vec!["ls".to_string(), "rm".to_string()])
+        );
+        assert!(kiro.denied_commands.is_empty());
+        Ok(())
+    }
 
-//     #[test_log::test]
-//     pub fn test_native_shell_kiro() -> Result<()> {
-//         let a = NativeTools::default();
-//         let kiro = KiroShellTool::from(&a);
-//         assert!(kiro.auto_allow_readonly);
-//         assert!(kiro.allowed_commands.is_empty());
-//         assert!(kiro.denied_commands.is_empty());
+    #[test_log::test]
+    pub fn test_native_read_kiro() -> Result<()> {
+        let a = NativeTools::default();
+        let kiro = KiroReadTool::from(&a);
+        assert!(kiro.allowed_paths.is_empty());
+        assert!(kiro.denied_paths.is_empty());
 
-//         let a = NativeTools {
-//             shell: Some(ExecuteShellTool {
-//                 allow: Some("ls".into()),
-//                 deny: Some("rm".into()),
-//                 deny_by_default: None,
-//                 disable_auto_readonly: None,
-//                 r#override: vec!["rm".into()],
-//             }),
-//             ..Default::default()
-//         };
-//         let kiro = KiroShellTool::from(&a);
-//         assert!(kiro.auto_allow_readonly);
-//         assert_eq!(kiro.allowed_commands.len(), 2);
-//         assert_eq!(
-//             kiro.allowed_commands,
-//             HashSet::from_iter(vec!["ls".to_string(), "rm".to_string()])
-//         );
-//         assert!(kiro.denied_commands.is_empty());
-//         Ok(())
-//     }
+        let a = NativeTools {
+            read: ReadTool {
+                allows: into_set(vec!["ls"]),
+                denies: into_set(vec!["rm"]),
+                overrides: into_set(vec!["rm"]),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let kiro = KiroReadTool::from(&a);
+        assert_eq!(kiro.allowed_paths.len(), 2);
+        assert_eq!(
+            kiro.allowed_paths,
+            into_set(vec!["ls".to_string(), "rm".to_string()])
+        );
+        assert!(kiro.denied_paths.is_empty());
+        Ok(())
+    }
 
-//     #[test_log::test]
-//     pub fn test_native_read_kiro() -> Result<()> {
-//         let a = NativeTools::default();
-//         let kiro = KiroReadTool::from(&a);
-//         assert!(kiro.allowed_paths.is_empty());
-//         assert!(kiro.denied_paths.is_empty());
+    #[test_log::test]
+    pub fn test_native_write_kiro() -> Result<()> {
+        let a = NativeTools::default();
+        let kiro = KiroWriteTool::from(&a);
+        assert!(kiro.allowed_paths.is_empty());
+        assert!(kiro.denied_paths.is_empty());
+        let write = WriteTool {
+            allows: into_set(vec!["ls"]),
+            denies: into_set(vec!["rm"]),
+            overrides: into_set(vec!["rm"]),
+            ..Default::default()
+        };
+        let a = NativeTools {
+            write,
+            ..Default::default()
+        };
 
-//         let a = NativeTools {
-//             read: Some(ReadTool {
-//                 allow: Some("ls".into()),
-//                 deny: Some("rm".into()),
-//                 r#override: vec!["rm".into()],
-//             }),
-//             ..Default::default()
-//         };
-//         let kiro = KiroReadTool::from(&a);
-//         assert_eq!(kiro.allowed_paths.len(), 2);
-//         assert_eq!(
-//             kiro.allowed_paths,
-//             HashSet::from_iter(vec!["ls".to_string(), "rm".to_string()])
-//         );
-//         assert!(kiro.denied_paths.is_empty());
-//         Ok(())
-//     }
-
-//     #[test_log::test]
-//     pub fn test_native_write_kiro() -> Result<()> {
-//         let a = NativeTools::default();
-//         let kiro = KiroWriteTool::from(&a);
-//         assert!(kiro.allowed_paths.is_empty());
-//         assert!(kiro.denied_paths.is_empty());
-
-//         let a = NativeTools {
-//             write: Some(WriteTool {
-//                 allow: Some("ls".into()),
-//                 deny: Some("rm".into()),
-//                 overrides: vec!["rm".into()],
-//             }),
-//             ..Default::default()
-//         };
-//         let kiro = KiroWriteTool::from(&a);
-//         assert_eq!(kiro.allowed_paths.len(), 2);
-//         assert_eq!(
-//             kiro.allowed_paths,
-//             HashSet::from_iter(vec!["ls".to_string(), "rm".to_string()])
-//         );
-//         assert!(kiro.denied_paths.is_empty());
-//         Ok(())
-//     }
-// }
+        let kiro = KiroWriteTool::from(&a);
+        assert_eq!(kiro.allowed_paths.len(), 2);
+        assert_eq!(
+            kiro.allowed_paths,
+            into_set(vec!["ls".to_string(), "rm".to_string()])
+        );
+        assert!(kiro.denied_paths.is_empty());
+        Ok(())
+    }
+}

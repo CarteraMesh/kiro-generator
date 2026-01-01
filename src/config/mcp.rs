@@ -1,4 +1,9 @@
-use {crate::agent::CustomToolConfig, facet::Facet, facet_kdl as kdl};
+use {
+    super::IntDoc,
+    crate::{agent::CustomToolConfig, config::GenericItem},
+    facet::Facet,
+    facet_kdl as kdl,
+};
 
 #[derive(Facet, Clone, Debug)]
 struct EnvVar {
@@ -16,12 +21,6 @@ struct Header {
     value: String,
 }
 
-#[derive(Facet, Default, Clone, Debug)]
-struct ToolArgs {
-    #[facet(kdl::arguments, default)]
-    args: Vec<String>,
-}
-
 #[derive(Facet, Clone, Debug, Eq, PartialEq)]
 pub struct RedirectUri {
     #[facet(kdl::argument)]
@@ -29,6 +28,13 @@ pub struct RedirectUri {
 }
 
 #[derive(Facet, Clone, Debug)]
+pub struct Disabled {
+    #[facet(kdl::argument)]
+    pub value: bool,
+}
+
+#[derive(Facet, Default, Clone, Debug)]
+#[facet(rename_all = "kebab-case", default)]
 pub struct CustomToolConfigDoc {
     #[facet(kdl::argument)]
     pub name: String,
@@ -39,8 +45,8 @@ pub struct CustomToolConfigDoc {
     #[facet(kdl::child, default)]
     pub command: Option<Command>,
 
-    #[facet(kdl::child, default)]
-    args: Option<ToolArgs>,
+    #[facet(kdl::children, default)]
+    args: Vec<GenericItem>,
 
     #[facet(kdl::children, default)]
     env: Vec<EnvVar>,
@@ -49,7 +55,7 @@ pub struct CustomToolConfigDoc {
     header: Vec<Header>,
 
     #[facet(kdl::child, default)]
-    pub timeout: Option<Timeout>,
+    pub(super) timeout: IntDoc,
 
     #[facet(kdl::child, default)]
     pub disabled: Option<Disabled>,
@@ -67,18 +73,6 @@ pub struct Command {
     pub value: String,
 }
 
-#[derive(Facet, Clone, Debug)]
-pub struct Timeout {
-    #[facet(kdl::argument)]
-    pub value: u64,
-}
-
-#[derive(Facet, Clone, Debug)]
-pub struct Disabled {
-    #[facet(kdl::argument)]
-    pub value: bool,
-}
-
 impl From<CustomToolConfigDoc> for CustomToolConfig {
     fn from(value: CustomToolConfigDoc) -> Self {
         let command = value.command.map(|c| c.value).unwrap_or_default();
@@ -87,12 +81,12 @@ impl From<CustomToolConfigDoc> for CustomToolConfig {
         Self {
             url,
             command,
-            args: value.args.map(|a| a.args).unwrap_or_default(),
-            timeout: value
-                .timeout
-                .map(|t| t.value)
-                .filter(|&t| t != 0)
-                .unwrap_or_else(crate::agent::tool_default_timeout),
+            args: value.args.into_iter().map(|v| v.item).collect(),
+            timeout: if value.timeout.value == 0 {
+                crate::agent::tool_default_timeout()
+            } else {
+                value.timeout.value
+            },
             disabled: value.disabled.map(|d| d.value).unwrap_or(false),
             headers: value.header.into_iter().map(|h| (h.key, h.value)).collect(),
             env: value.env.into_iter().map(|e| (e.key, e.value)).collect(),
@@ -126,7 +120,7 @@ mod tests {
         let doc: McpDoc = facet_kdl::from_str(kdl).unwrap();
         assert_eq!(doc.mcp.name, "rustdocs");
         assert_eq!(doc.mcp.command.unwrap().value, "rust-docs-mcp");
-        assert_eq!(doc.mcp.timeout.unwrap().value, 1000);
+        assert_eq!(doc.mcp.timeout.value, 1000);
     }
 
     #[test]
@@ -163,11 +157,8 @@ mod tests {
         }"#;
 
         let doc: McpDoc = facet_kdl::from_str(kdl).unwrap();
-        assert_eq!(doc.mcp.args.unwrap().args, vec![
-            "--verbose",
-            "--output",
-            "json"
-        ]);
+        let args: Vec<String> = doc.mcp.args.into_iter().map(|v| v.item).collect();
+        assert_eq!(args, vec!["--verbose", "--output", "json"]);
     }
 
     #[test]

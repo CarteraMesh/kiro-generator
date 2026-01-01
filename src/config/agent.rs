@@ -1,10 +1,14 @@
 use {
     super::{
+        GenericItem,
         hook::{HookDoc, HookPart},
         mcp::CustomToolConfigDoc,
-        native::{NativeTools, NativeToolsDoc},
+        native::{AwsTool, ExecuteShellTool, NativeTools, NativeToolsDoc, ReadTool, WriteTool},
     },
-    crate::agent::{CustomToolConfig, OriginalToolName},
+    crate::{
+        agent::{CustomToolConfig, OriginalToolName},
+        config::split_newline,
+    },
     color_eyre::eyre::WrapErr,
     facet::Facet,
     facet_kdl as kdl,
@@ -15,45 +19,9 @@ use {
     },
 };
 
-#[derive(Facet, Clone, Default, Debug)]
-pub(super) struct Inherits {
-    #[facet(kdl::arguments)]
-    pub parents: Vec<String>,
-}
-
-#[derive(Facet, Clone, Default, Debug)]
-pub(super) struct Tools {
-    #[facet(kdl::arguments)]
-    pub tools: Vec<String>,
-}
-
-#[derive(Facet, Clone, Default, Debug)]
-pub(super) struct AllowedTools {
-    #[facet(kdl::arguments)]
-    pub allowed: Vec<String>,
-}
-
-#[derive(Facet, Clone, Default, Debug)]
-pub(super) struct Resource {
-    #[facet(kdl::argument)]
-    pub location: String,
-}
-
-impl PartialEq for Resource {
-    fn eq(&self, other: &Self) -> bool {
-        self.location.eq(&other.location)
-    }
-}
-
-impl Hash for Resource {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.location.hash(state);
-    }
-}
-impl Eq for Resource {}
-
 #[derive(Facet, Clone, Default, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct ToolAliasKdl {
+    #[facet(default)]
     #[facet(kdl::argument)]
     from: String,
     #[facet(kdl::argument)]
@@ -112,56 +80,52 @@ pub struct KdlAgent {
 }
 
 #[derive(Facet, Clone, Default)]
-#[facet(rename = "kabel-case", default)]
+#[facet(rename_all = "kebab-case", default)]
 pub struct KdlAgentDoc {
     #[facet(kdl::argument)]
     pub name: String,
-    #[facet(kdl::property)]
+
+    #[facet(kdl::property, default)]
     pub template: Option<bool>,
+
     #[facet(kdl::child, default)]
-    pub description: Option<Description>,
-    #[facet(kdl::child, default)]
-    pub(super) inherits: Inherits,
-    #[facet(kdl::child, default)]
-    pub prompt: Option<Prompt>,
+    pub(super) description: Option<GenericItem>,
+
     #[facet(kdl::children, default)]
-    pub(super) resources: Vec<Resource>,
+    pub(super) inherits: Vec<GenericItem>,
+
+    #[facet(kdl::child, default)]
+    pub(super) prompt: Option<GenericItem>,
+
+    #[facet(kdl::children, default)]
+    pub(super) resources: Vec<GenericItem>,
+
     #[facet(kdl::property, default)]
     pub include_mcp_json: Option<bool>,
+
+    #[facet(kdl::children, rename = "tools", default)]
+    pub(super) tools: Vec<GenericItem>,
+
+    #[facet(kdl::children, rename = "allowed_tools", default)]
+    pub(super) allowed_tools: Vec<GenericItem>,
+
     #[facet(kdl::child, default)]
-    pub(super) tools: Option<Tools>,
-    #[facet(kdl::child, default)]
-    pub(super) allowed_tools: Option<AllowedTools>,
-    #[facet(kdl::child, default)]
-    pub model: Option<Model>,
+    pub(super) model: Option<GenericItem>,
+
     #[facet(kdl::child, default)]
     pub(super) hook: Option<HookDoc>,
+
     #[facet(kdl::children, default)]
     pub(super) mcp: Vec<CustomToolConfigDoc>,
+
     #[facet(kdl::children, default)]
     pub(super) alias: Vec<ToolAliasKdl>,
+
     #[facet(kdl::child, default)]
     pub native_tool: NativeToolsDoc,
+
     #[facet(kdl::children, default)]
     pub(super) tool_setting: Vec<ToolSetting>,
-}
-
-#[derive(Facet, Clone, Default, Debug)]
-pub struct Description {
-    #[facet(kdl::argument)]
-    value: String,
-}
-
-#[derive(Facet, Clone, Default, Debug)]
-pub struct Prompt {
-    #[facet(kdl::argument)]
-    value: String,
-}
-
-#[derive(Facet, Clone, Debug)]
-pub struct Model {
-    #[facet(kdl::argument)]
-    value: String,
 }
 
 impl Debug for KdlAgent {
@@ -180,8 +144,8 @@ impl From<KdlAgentDoc> for KdlAgent {
     fn from(value: KdlAgentDoc) -> Self {
         Self {
             name: value.name.clone(),
-            description: value.description.as_ref().map(|f| f.value.clone()),
-            prompt: value.prompt.as_ref().map(|f| f.value.clone()),
+            description: value.description.as_ref().map(|f| f.item.clone()),
+            prompt: value.prompt.as_ref().map(|f| f.item.clone()),
             alias: value.tool_aliases(),
             allowed_tools: value.allowed_tools(),
             inherits: value.inherits(),
@@ -189,7 +153,7 @@ impl From<KdlAgentDoc> for KdlAgent {
             include_mcp_json: value.include_mcp_json,
             hook: value.hooks(),
             resources: value.resources(),
-            model: value.model.as_ref().map(|f| f.value.clone()),
+            model: value.model.as_ref().map(|f| f.item.clone()),
             mcp: value.mcp_servers(),
             tools: value.tools(),
             tool_setting: Default::default(), // TODO use facet::Value
@@ -209,14 +173,31 @@ impl KdlAgent {
     pub fn is_template(&self) -> bool {
         self.template.is_some_and(|f| f)
     }
+
+    pub fn get_tool_aws(&self) -> &AwsTool {
+        &self.native_tool.aws
+    }
+
+    pub fn get_tool_read(&self) -> &ReadTool {
+        &self.native_tool.read
+    }
+
+    pub fn get_tool_write(&self) -> &WriteTool {
+        &self.native_tool.write
+    }
+
+    pub fn get_tool_shell(&self) -> &ExecuteShellTool {
+        &self.native_tool.shell
+    }
 }
+
 impl KdlAgentDoc {
     pub fn prompt(&self) -> String {
-        self.prompt.clone().unwrap_or_default().value
+        self.prompt.clone().unwrap_or_default().item
     }
 
     pub fn description(&self) -> String {
-        self.description.clone().unwrap_or_default().value
+        self.description.clone().unwrap_or_default().item
     }
 
     pub fn new(name: impl AsRef<str>) -> Self {
@@ -242,25 +223,19 @@ impl KdlAgentDoc {
     }
 
     pub fn allowed_tools(&self) -> HashSet<String> {
-        self.allowed_tools
-            .as_ref()
-            .map(|a| HashSet::from_iter(a.allowed.clone()))
-            .unwrap_or_default()
+        split_newline(self.allowed_tools.clone())
     }
 
     pub fn tools(&self) -> HashSet<String> {
-        self.tools
-            .as_ref()
-            .map(|t| HashSet::from_iter(t.tools.clone()))
-            .unwrap_or_default()
+        split_newline(self.tools.clone())
     }
 
     pub fn inherits(&self) -> HashSet<String> {
-        HashSet::from_iter(self.inherits.parents.clone())
+        split_newline(self.inherits.clone())
     }
 
     pub fn resources(&self) -> HashSet<String> {
-        HashSet::from_iter(self.resources.iter().map(|r| r.location.clone()))
+        split_newline(self.resources.clone())
     }
 
     pub fn mcp_servers(&self) -> HashMap<String, CustomToolConfig> {

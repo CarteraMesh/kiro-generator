@@ -5,39 +5,342 @@ mod mcp;
 mod merge;
 mod native;
 
-use std::{collections::HashMap, fmt::Debug};
-
 pub use agent::{KdlAgent, KdlAgentDoc};
+use {
+    crate::Fs,
+    facet::Facet,
+    facet_kdl as kdl,
+    miette::IntoDiagnostic,
+    std::{
+        collections::{HashMap, HashSet},
+        fmt::{Debug, Display},
+        path::Path,
+    },
+};
+
+pub(crate) type ConfigResult<T> = miette::Result<T>;
+#[derive(Facet, Debug, Default, PartialEq, Clone, Eq, Hash)]
+#[facet(default)]
+pub(super) struct GenericItem {
+    #[facet(kdl::argument)]
+    pub item: String,
+}
+
+impl Display for GenericItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.item)
+    }
+}
+
+impl AsRef<str> for GenericItem {
+    fn as_ref(&self) -> &str {
+        self.item.as_ref()
+    }
+}
+
+#[derive(Facet, Copy, Default, Clone, Debug, PartialEq, Eq)]
+#[facet(default)]
+pub(super) struct IntDoc {
+    #[facet(kdl::argument)]
+    pub value: u64,
+}
+impl AsRef<u64> for IntDoc {
+    fn as_ref(&self) -> &u64 {
+        &self.value
+    }
+}
+
+pub(super) fn split_newline(list: Vec<GenericItem>) -> HashSet<String> {
+    list.iter()
+        .flat_map(|f| f.item.split('\n'))
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && s.is_ascii())
+        .map(String::from)
+        .collect()
+}
+
+pub fn kdl_parse_path<'facet: 'shape, 'shape, T>(
+    fs: &Fs,
+    content: impl AsRef<Path>,
+) -> ConfigResult<T>
+where
+    T: facet::Facet<'facet>,
+{
+    Ok(kdl_parse("")?)
+}
+
+pub fn kdl_parse<'input, 'facet: 'shape, 'shape, T>(content: &'input str) -> ConfigResult<T>
+where
+    T: facet::Facet<'facet>,
+    'input: 'facet,
+{
+    kdl::from_str(content).into_diagnostic()
+}
 
 #[derive(facet::Facet, Default)]
 pub struct GeneratorConfigDoc {
     #[facet(facet_kdl::children, default)]
-    pub agent: Vec<KdlAgentDoc>,
+    pub agents: Vec<KdlAgentDoc>,
 }
 
 #[derive(Default)]
 pub struct GeneratorConfig {
-    pub agent: HashMap<String, KdlAgent>,
+    pub agents: HashMap<String, KdlAgent>,
 }
 
 impl From<GeneratorConfigDoc> for GeneratorConfig {
     fn from(value: GeneratorConfigDoc) -> Self {
-        let mut agent: HashMap<String, KdlAgent> = HashMap::with_capacity(value.agent.len());
-        for a in value.agent {
+        let mut agent: HashMap<String, KdlAgent> = HashMap::with_capacity(value.agents.len());
+        for a in value.agents {
             agent.insert(a.name.clone(), a.into());
         }
-        Self { agent }
+        Self { agents: agent }
     }
 }
 
 impl Debug for GeneratorConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "agents={}", self.agent.len())
+        writeln!(f, "agents={}", self.agents.len())
     }
 }
 
 impl GeneratorConfig {
     pub fn get(&self, name: impl AsRef<str>) -> Option<&KdlAgent> {
-        self.agent.get(name.as_ref())
+        self.agents.get(name.as_ref())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, crate::config::agent_file::KdlAgentFileDoc};
+
+    #[test_log::test]
+    fn test_agent_decoding() -> ConfigResult<()> {
+        let kdl_agents = indoc::indoc! {r#"
+            agent "test" include-mcp-json=#true {
+                inherits "parent"
+                description "This is a test agent"
+                prompt "Generate a test prompt"
+                resource "file://resource.md"
+                resource "file://README.md"
+                tools "*"
+                allowed-tools "@awsdocs"
+                hook {
+                    agent-spawn "spawn" {
+                        command "echo i have spawned"
+                        timeout-ms 1000
+                        max-output-size 9000
+                        cache-ttl-seconds 2
+                    }
+                    user-prompt-submit "submit" {
+                        command "echo user submitted"
+                    }
+                    pre-tool-use "pre" {
+                        command "echo before tool"
+                        matcher "git.*"
+                    }
+                    post-tool-use "post" {
+                        command "echo after tool"
+                    }
+                    stop "stop" {
+                        command "echo stopped"
+                    }
+                }
+
+                mcp "awsdocs" {
+                   command "aws-docs"
+                   args """
+                   --verbose
+                   --config=/path
+                   """
+                   env "RUST_LOG" "debug"
+                   env "PATH" "/usr/bin"
+                   header "Authorization" "Bearer token"
+                   timeout 5000
+                }
+
+                alias "execute_bash" "shell"
+
+                native-tool {
+                   write {
+                       allow "./src/*" 
+                       allow "./scripts/**"
+                       deny  "Cargo.lock"
+                       override "/tmp"
+                       override "/var/log"
+                   }
+                   shell deny-by-default=#true {
+                      allow "git status .*"
+                      deny "git push .*"
+                      override "git pull .*"
+                   }
+                }
+            }
+        "#};
+
+        let config: GeneratorConfigDoc = kdl_parse(kdl_agents)?;
+        assert_eq!(config.agents.len(), 1);
+        let config = GeneratorConfig::from(config);
+        let agent = config.agents.get("test");
+        assert!(agent.is_some());
+        let agent = agent.unwrap().clone();
+        assert_eq!(agent.name, "test");
+        assert!(agent.model.is_none());
+        assert!(!agent.is_template());
+        let inherits = &agent.inherits;
+        assert_eq!(inherits.len(), 1);
+        assert_eq!(inherits.iter().next().unwrap(), "parent");
+        assert!(agent.description.is_some());
+        assert!(agent.prompt.is_some());
+        assert!(agent.include_mcp_json.unwrap_or_default());
+        let tools = &agent.tools;
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools.iter().next().unwrap(), "*");
+        let resources = &agent.resources;
+        assert_eq!(resources.len(), 2);
+        assert!(resources.contains(&"file://resource.md".to_string()));
+        assert!(resources.contains(&"file://README.md".to_string()));
+
+        let hooks = &agent.hook;
+        let hook = &hooks.agent_spawn.get("spawn");
+        assert!(hook.is_some());
+        let hook = hook.unwrap();
+        assert_eq!(hook.command, "echo i have spawned");
+
+        // assert!(hooks.contains_key(&HookTrigger::PreToolUse));
+        // assert!(hooks.contains_key(&HookTrigger::PostToolUse));
+        // assert!(hooks.contains_key(&HookTrigger::Stop));
+        // assert!(hooks.contains_key(&HookTrigger::UserPromptSubmit));
+
+        let allowed = &agent.allowed_tools;
+        assert_eq!(allowed.len(), 1);
+        assert_eq!(allowed.iter().next().unwrap(), "@awsdocs");
+
+        let mcp = &agent.mcp;
+        assert_eq!(mcp.len(), 1);
+        assert!(mcp.contains_key("awsdocs"));
+        let aws_docs = mcp.get("awsdocs").unwrap();
+        assert_eq!(aws_docs.command, "aws-docs");
+        assert_eq!(aws_docs.args, vec!["--verbose\n--config=/path"]);
+        assert!(!aws_docs.disabled);
+        assert_eq!(aws_docs.headers.len(), 1);
+        assert_eq!(aws_docs.env.len(), 2);
+        assert_eq!(aws_docs.timeout, 5000);
+        assert_eq!(agent.alias.len(), 1);
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn test_agent_empty() -> ConfigResult<()> {
+        let kdl_agents = r#"
+            agent "test" template=#true {
+            }
+        "#;
+
+        let config: GeneratorConfigDoc = kdl_parse(kdl_agents)?;
+        let config = GeneratorConfig::from(config);
+        assert!(!format!("{config:?}").is_empty());
+        assert_eq!(config.agents.len(), 1);
+        let agent = config.agents.get("test").unwrap();
+        assert_eq!(agent.name, "test");
+        assert!(agent.model.is_none());
+        assert!(agent.is_template());
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn test_agent_file_source() -> ConfigResult<()> {
+        let kdl_agent_file_source = r#"
+            description "agent from file"
+            prompt "Generate a test prompt"
+            resource "file://resource.md"
+            resource "file://README.md"
+            include-mcp-json #true
+            tools "*"
+
+            allowed-tools "@awsdocs"
+            hook {
+                agent-spawn "spawn" {
+                    command "echo i have spawned"
+                    timeout-ms 1000
+                    max-output-size 9000
+                    cache-ttl-seconds 2
+                }
+                user-prompt-submit "submit" {
+                    command "echo user submitted"
+                }
+                pre-tool-use "pre" {
+                    command "echo before tool"
+                    matcher "git.*"
+                }
+                post-tool-use "post" {
+                    command "echo after tool"
+                }
+                stop "stop" {
+                    command "echo stopped"
+                }
+            }
+
+            mcp "awsdocs" {
+               command "aws-docs"
+               args """
+               --verbose
+               --config=/path
+               """
+               env "RUST_LOG" "debug"
+               env "PATH" "/usr/bin"
+               header "Authorization" "Bearer token"
+               timeout 5000
+            }
+
+            alias "execute_bash" "shell"
+
+            native-tool {
+               write {
+                   allow "./src/*"
+                   allow "./scripts/**"
+                   deny  "Cargo.lock"
+                   override "/tmp"
+                   override "/var/log"
+               }
+               shell deny-by-default=#true {
+                  allow "git status .*"
+                  deny "git push .*"
+                  override "git pull .*"
+               }
+            }
+            "#;
+
+        let agent: KdlAgentFileDoc = kdl_parse(kdl_agent_file_source)?;
+        assert_eq!(
+            agent.description.unwrap_or_default().to_string(),
+            "agent from file"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn test_tool_setting_invalid_json() -> ConfigResult<()> {
+        let _kdl = r#"
+            agent "test" {
+                tool-setting "bad" {
+                    json "{ invalid json }"
+                }
+            }
+        "#;
+        // TODO
+        // let config: GeneratorConfig = kdl_parse(kdl)?;
+        // let result = config.agents[0].extra_tool_settings();
+        // assert!(result.is_err());
+        // assert!(
+        //     result
+        //         .unwrap_err()
+        //         .to_string()
+        //         .contains("Failed to parse JSON")
+        // );
+        Ok(())
     }
 }

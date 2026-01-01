@@ -4,7 +4,7 @@ use {
 };
 
 const DEFAULT_TIMEOUT_MS: u64 = 30_000;
-const DEFAULT_MAX_OUTPUT_SIZE: usize = 1024 * 10;
+const DEFAULT_MAX_OUTPUT_SIZE: u64 = 1024 * 10;
 const DEFAULT_CACHE_TTL_SECONDS: u64 = 0;
 
 #[derive(
@@ -47,7 +47,7 @@ pub struct Hook {
 
     /// Max output size of the hook before it is truncated
     #[serde(default = "Hook::default_max_output_size")]
-    pub max_output_size: usize,
+    pub max_output_size: u64,
 
     /// How long the hook output is cached before it will be executed again
     #[serde(default = "Hook::default_cache_ttl_seconds")]
@@ -95,7 +95,7 @@ impl Hook {
         DEFAULT_TIMEOUT_MS
     }
 
-    fn default_max_output_size() -> usize {
+    fn default_max_output_size() -> u64 {
         DEFAULT_MAX_OUTPUT_SIZE
     }
 

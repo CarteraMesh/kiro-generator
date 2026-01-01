@@ -94,12 +94,12 @@ pub fn discover(
     let local_path = location.local_kg();
     let global_agents: GeneratorConfig = load_inline(fs, global_path)?;
     let local_agents: GeneratorConfig = load_inline(fs, local_path)?;
-    tracing::debug!("found {} local agents", local_agents.agent.len());
+    tracing::debug!("found {} local agents", local_agents.agents.len());
 
     let local_names: HashSet<String> =
-        HashSet::from_iter(local_agents.agent.keys().map(|k| k.to_string()));
+        HashSet::from_iter(local_agents.agents.keys().map(|k| k.to_string()));
     let global_names: HashSet<String> =
-        HashSet::from_iter(global_agents.agent.keys().map(|k| k.to_string()));
+        HashSet::from_iter(global_agents.agents.keys().map(|k| k.to_string()));
     let mut all_agents_names: HashSet<String> =
         HashSet::with_capacity(global_names.len() + local_names.len());
     all_agents_names.extend(local_names.clone());

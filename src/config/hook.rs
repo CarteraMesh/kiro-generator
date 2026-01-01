@@ -1,39 +1,10 @@
 use {
+    super::IntDoc,
     crate::agent::hook::{Hook, HookTrigger},
     facet::Facet,
     facet_kdl as kdl,
     std::collections::HashMap,
 };
-
-#[derive(Facet, Clone, Debug, PartialEq, Eq)]
-struct Command {
-    #[facet(kdl::argument)]
-    value: String,
-}
-
-#[derive(Facet, Clone, Debug, PartialEq, Eq)]
-struct TimeoutMs {
-    #[facet(kdl::argument)]
-    value: usize,
-}
-
-#[derive(Facet, Clone, Debug, PartialEq, Eq)]
-struct MaxOutputSize {
-    #[facet(kdl::argument)]
-    value: usize,
-}
-
-#[derive(Facet, Clone, Debug, PartialEq, Eq)]
-struct CacheTtlSeconds {
-    #[facet(kdl::argument)]
-    value: usize,
-}
-
-#[derive(Facet, Clone, Debug, PartialEq, Eq)]
-struct Matcher {
-    #[facet(kdl::argument)]
-    value: String,
-}
 
 macro_rules! define_hook_doc {
     ($name:ident) => {
@@ -57,9 +28,9 @@ macro_rules! define_hook_doc {
             fn from(value: $name) -> Hook {
                 Hook {
                     command: value.command.value,
-                    timeout_ms: value.timeout_ms.value as u64,
+                    timeout_ms: value.timeout_ms.value,
                     max_output_size: value.max_output_size.value,
-                    cache_ttl_seconds: value.cache_ttl_seconds.value as u64,
+                    cache_ttl_seconds: value.cache_ttl_seconds.value,
                     matcher: value.matcher.map(|m| m.value),
                 }
             }
@@ -72,13 +43,6 @@ macro_rules! define_hook_doc {
 struct GenericValue {
     #[facet(kdl::argument)]
     value: String,
-}
-
-#[derive(Facet, Default, Clone, Debug, PartialEq, Eq)]
-#[facet(default)]
-struct IntDoc {
-    #[facet(kdl::argument)]
-    value: usize,
 }
 
 define_hook_doc!(HookAgentSpawnDoc);
@@ -183,98 +147,138 @@ fn merge_hooks(
     base
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use {super::*, crate::Result, std::time::Duration};
+#[cfg(test)]
+mod tests {
+    use {super::*, crate::Result, std::time::Duration};
 
-//     macro_rules! rando_hook {
-//         ($name:ident) => {
-//             impl $name {
-//                 fn rando() -> $name {
-//                     let value = std::time::SystemTime::now()
-//                         .duration_since(std::time::UNIX_EPOCH)
-//                         .unwrap()
-//                         .as_secs();
-//                     Self {
-//                         name: format!("$name-{value}"),
-//                         command: Some(Command {
-//                             value: format!("{value}"),
-//                         }),
-//                         timeout_ms: Some(TimeoutMs { value }),
-//                         max_output_size: None,
-//                         cache_ttl_seconds: Some(CacheTtlSeconds { value }),
-//                         matcher: Some(Matcher {
-//                             value: format!("{value}"),
-//                         }),
-//                     }
-//                 }
-//             }
-//         };
-//     }
-//     rando_hook!(HookAgentSpawn);
-//     rando_hook!(HookUserPromptSubmit);
-//     rando_hook!(HookPreToolUse);
-//     rando_hook!(HookPostToolUse);
-//     rando_hook!(HookStop);
+    fn rando() -> HashMap<String, Hook> {
+        let value = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
 
-//     impl HookPart {
-//         pub fn randomize() -> Self {
-//             Self {
-//                 agent_spawn: vec![HookAgentSpawn::rando()],
-//                 user_prompt_submit: vec![HookUserPromptSubmit::rando()],
-//                 pre_tool_use: vec![HookPreToolUse::rando()],
-//                 post_tool_use: vec![HookPostToolUse::rando()],
-//                 stop: vec![HookStop::rando()],
-//             }
-//         }
-//     }
+        let name = format!("$name-{value}");
+        let mut hooks = HashMap::new();
+        hooks.insert(name, Hook {
+            command: format!("{value}"),
+            timeout_ms: value,
+            max_output_size: value,
+            cache_ttl_seconds: value,
+            matcher: Some(format!("{value}")),
+        });
+        hooks
+    }
 
-//     #[test_log::test]
-//     pub fn test_hooks_empty() -> Result<()> {
-//         let child = HookPart::default();
-//         let parent = HookPart::default();
-//         let merged = child.merge(parent);
+    impl HookPart {
+        pub fn randomize() -> Self {
+            Self {
+                agent_spawn: rando(),
+                user_prompt_submit: rando(),
+                pre_tool_use: rando(),
+                post_tool_use: rando(),
+                stop: rando(),
+            }
+        }
+    }
+    #[test_log::test]
+    pub fn test_hooks_kdl() -> Result<()> {
+        let kdl = r#"
+            agent-spawn "test" {
+                command "echo"
+                timeout-ms  1231
+                max-output-size 69
+                cache-ttl-seconds 666
+                matcher "blah"
+            }
+            user-prompt-submit "prompt-hook" {
+                command "validate-prompt"
+                timeout-ms 500
+            }
+            pre-tool-use "pre-hook" {
+                command "pre-check"
+                matcher "git*"
+            }
+            post-tool-use "post-hook" {
+                command "post-check"
+            }
+            stop "cleanup" {
+                command "cleanup-script"
+                cache-ttl-seconds 0
+            }
+        "#;
+        let doc: HookDoc = facet_kdl::from_str(kdl)?;
+        let doc = HookPart::from(doc);
 
-//         assert!(merged.agent_spawn.is_empty());
-//         assert!(merged.user_prompt_submit.is_empty());
-//         assert!(merged.pre_tool_use.is_empty());
-//         assert!(merged.post_tool_use.is_empty());
-//         assert!(merged.stop.is_empty());
-//         Ok(())
-//     }
+        assert_eq!(1, doc.agent_spawn.len());
+        let hook = doc.agent_spawn.get("test");
+        assert!(hook.is_some());
+        let hook = hook.unwrap();
+        assert_eq!(hook.command, "echo");
+        assert_eq!(hook.timeout_ms, 1231);
+        assert_eq!(hook.max_output_size, 69);
 
-//     #[test_log::test]
-//     pub fn test_hooks_empty_child() -> Result<()> {
-//         let child = HookPart::default();
-//         let parent = HookPart::randomize();
-//         let before = parent.clone();
-//         let merged = child.merge(parent);
+        assert_eq!(1, doc.user_prompt_submit.len());
+        assert!(doc.user_prompt_submit.contains_key("prompt-hook"));
 
-//         assert_eq!(merged, before);
-//         Ok(())
-//     }
+        assert_eq!(1, doc.pre_tool_use.len());
+        let pre = doc.pre_tool_use.get("pre-hook").unwrap();
+        assert_eq!(pre.matcher, Some("git*".to_string()));
 
-//     #[test_log::test]
-//     pub fn test_hooks_no_merge() -> Result<()> {
-//         let child = HookPart::randomize();
-//         let parent = HookPart::randomize();
-//         let before = child.clone();
-//         let merged = child.merge(parent);
-//         assert_eq!(merged, before);
-//         Ok(())
-//     }
+        assert_eq!(1, doc.post_tool_use.len());
+        assert!(doc.post_tool_use.contains_key("post-hook"));
 
-//     #[test_log::test]
-//     pub fn test_hooks_merge_parent() -> Result<()> {
-//         let child = HookPart::randomize();
-//         std::thread::sleep(Duration::from_millis(1300));
-//         let parent = HookPart::randomize();
-//         let merged = child.merge(parent);
-//         assert_eq!(merged.agent_spawn.len(), 2);
-//         assert_eq!(merged.user_prompt_submit.len(), 2);
-//         assert_eq!(merged.pre_tool_use.len(), 2);
-//         assert_eq!(merged.post_tool_use.len(), 2);
-//         assert_eq!(merged.stop.len(), 2);
-//         Ok(())
-//     }
-// }
+        assert_eq!(1, doc.stop.len());
+        assert!(doc.stop.contains_key("cleanup"));
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    pub fn test_hooks_empty() -> Result<()> {
+        let child = HookPart::default();
+        let parent = HookPart::default();
+        let merged = child.merge(parent);
+
+        assert!(merged.agent_spawn.is_empty());
+        assert!(merged.user_prompt_submit.is_empty());
+        assert!(merged.pre_tool_use.is_empty());
+        assert!(merged.post_tool_use.is_empty());
+        assert!(merged.stop.is_empty());
+        Ok(())
+    }
+
+    #[test_log::test]
+    pub fn test_hooks_empty_child() -> Result<()> {
+        let child = HookPart::default();
+        let parent = HookPart::randomize();
+        let before = parent.clone();
+        let merged = child.merge(parent);
+
+        assert_eq!(merged, before);
+        Ok(())
+    }
+
+    #[test_log::test]
+    pub fn test_hooks_no_merge() -> Result<()> {
+        let child = HookPart::randomize();
+        let parent = HookPart::randomize();
+        let before = child.clone();
+        let merged = child.merge(parent);
+        assert_eq!(merged, before);
+        Ok(())
+    }
+
+    #[test_log::test]
+    pub fn test_hooks_merge_parent() -> Result<()> {
+        let child = HookPart::randomize();
+        std::thread::sleep(Duration::from_millis(1300));
+        let parent = HookPart::randomize();
+        let merged = child.merge(parent);
+        assert_eq!(merged.agent_spawn.len(), 2);
+        assert_eq!(merged.user_prompt_submit.len(), 2);
+        assert_eq!(merged.pre_tool_use.len(), 2);
+        assert_eq!(merged.post_tool_use.len(), 2);
+        assert_eq!(merged.stop.len(), 2);
+        Ok(())
+    }
+}

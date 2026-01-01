@@ -1,5 +1,11 @@
 use {
-    super::{agent::*, hook::HookDoc, mcp::CustomToolConfigDoc, native::NativeToolsDoc},
+    super::{
+        GenericItem,
+        agent::*,
+        hook::HookDoc,
+        mcp::CustomToolConfigDoc,
+        native::NativeToolsDoc,
+    },
     crate::Fs,
     color_eyre::eyre::eyre,
     facet::Facet,
@@ -8,25 +14,36 @@ use {
     std::path::Path,
 };
 
+#[derive(Facet, Copy, Default, Clone, Debug, PartialEq, Eq)]
+#[facet(default)]
+pub(super) struct BoolDoc {
+    #[facet(kdl::argument)]
+    pub value: bool,
+}
 #[derive(Facet, Clone, Default)]
-#[facet(rename = "kabel-case", default)]
+#[facet(rename_all = "kebab-case", default)]
 pub struct KdlAgentFileDoc {
     #[facet(kdl::child, default)]
-    pub description: Option<Description>,
-    #[facet(kdl::child, default)]
-    pub(super) inherits: Inherits,
-    #[facet(kdl::child, default)]
-    pub(super) prompt: Option<Prompt>,
+    pub(super) description: Option<GenericItem>,
     #[facet(kdl::children, default)]
-    pub(super) resources: Vec<Resource>,
-    #[facet(kdl::property, default)]
-    pub include_mcp_json: Option<bool>,
+    pub(super) inherits: Vec<GenericItem>,
     #[facet(kdl::child, default)]
-    pub(super) tools: Option<Tools>,
+    pub(super) prompt: Option<GenericItem>,
+    #[facet(kdl::children, default)]
+    pub(super) resources: Vec<GenericItem>,
+
     #[facet(kdl::child, default)]
-    pub(super) allowed_tools: Option<AllowedTools>,
+    pub(super) include_mcp_json: Option<BoolDoc>,
+
+    #[facet(kdl::children, default)]
+    pub(super) tools: Vec<GenericItem>,
+
+    #[facet(kdl::children, default)]
+    pub(super) allowed_tools: Vec<GenericItem>,
+
     #[facet(kdl::child, default)]
-    pub(super) model: Option<Model>,
+    pub(super) model: Option<GenericItem>,
+
     #[facet(kdl::child, default)]
     pub(super) hook: Option<HookDoc>,
     #[facet(kdl::children, default)]
@@ -61,10 +78,10 @@ impl KdlAgentDoc {
             name: name.as_ref().to_string(),
             description: file_source.description,
             template: None,
-            inherits: Inherits::default(),
+            inherits: file_source.inherits,
             prompt: file_source.prompt,
             resources: file_source.resources,
-            include_mcp_json: file_source.include_mcp_json,
+            include_mcp_json: Some(file_source.include_mcp_json.unwrap_or_default().value),
             tools: file_source.tools,
             allowed_tools: file_source.allowed_tools,
             model: file_source.model,
