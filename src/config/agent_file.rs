@@ -7,10 +7,9 @@ use {
         native::NativeToolsDoc,
     },
     crate::Fs,
-    color_eyre::eyre::eyre,
     facet::Facet,
     facet_kdl as kdl,
-    miette::IntoDiagnostic,
+    miette::{Context, IntoDiagnostic},
     std::path::Path,
 };
 
@@ -21,7 +20,7 @@ pub(super) struct BoolDoc {
     pub value: bool,
 }
 #[derive(Facet, Clone, Default)]
-#[facet(rename_all = "kebab-case", default)]
+#[facet(deny_unknown_fields, rename_all = "kebab-case", default)]
 pub struct KdlAgentFileDoc {
     #[facet(kdl::child, default)]
     pub(super) description: Option<GenericItem>,
@@ -66,10 +65,13 @@ impl KdlAgentDoc {
             return Ok(None);
         }
 
-        let content = fs.read_to_string_sync(&path)?;
-        let agent: KdlAgentFileDoc = kdl::from_str(&content)
+        let content = fs
+            .read_to_string_sync(&path)
             .into_diagnostic()
-            .map_err(|e| eyre!("failed {} {e}", path.as_ref().display()))?;
+            .wrap_err(format!("unable to read {}", path.as_ref().display()))?;
+        let agent: KdlAgentFileDoc = kdl::from_str(&content).into_diagnostic().map_err(|e| {
+            crate::format_err!("failed {} error:'{e}'\n{content}", path.as_ref().display())
+        })?;
         Ok(Some(Self::from_file_source(name, agent)))
     }
 

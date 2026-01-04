@@ -8,7 +8,7 @@ pub const DEFAULT_APPROVE: [&str; 0] = [];
 use {
     super::agent::hook::{Hook, HookTrigger},
     crate::{Result, config::KdlAgent},
-    color_eyre::eyre::eyre,
+    miette::IntoDiagnostic,
     serde::{Deserialize, Serialize},
     std::{
         collections::{HashMap, HashSet},
@@ -78,15 +78,17 @@ impl Display for Agent {
 
 impl Agent {
     pub fn validate(&self) -> Result<()> {
-        let schema: serde_json::Value = serde_json::from_str(crate::schema::SCHEMA)?;
-        let validator = jsonschema::validator_for(&schema)?;
-        let instance = serde_json::to_value(self)?;
+        // TODO cache this
+        let schema: serde_json::Value =
+            serde_json::from_str(crate::schema::SCHEMA).into_diagnostic()?;
+        let validator = jsonschema::validator_for(&schema).into_diagnostic()?;
+        let instance = serde_json::to_value(self).into_diagnostic()?;
 
         if let Err(e) = validator.validate(&instance) {
-            return Err(eyre!(
+            return Err(crate::format_err!(
                 "Validation error: {}\n{}",
                 e,
-                serde_json::to_string(&instance)?
+                serde_json::to_string(&instance).unwrap_or_default()
             ));
         }
         Ok(())
@@ -94,7 +96,7 @@ impl Agent {
 }
 
 impl TryFrom<&KdlAgent> for Agent {
-    type Error = color_eyre::Report;
+    type Error = miette::Report;
 
     fn try_from(value: &KdlAgent) -> std::result::Result<Self, Self::Error> {
         let native_tools = &value.native_tool;
@@ -106,7 +108,7 @@ impl TryFrom<&KdlAgent> for Agent {
             tools_settings.insert(
                 tool_name.to_string(),
                 serde_json::to_value(&tool).map_err(|e| {
-                    eyre!(
+                    crate::format_err!(
                         "Failed to serialize {tool_name} tool
     configuration {e}"
                     )
@@ -119,7 +121,7 @@ impl TryFrom<&KdlAgent> for Agent {
             tools_settings.insert(
                 tool_name.to_string(),
                 serde_json::to_value(&tool).map_err(|e| {
-                    eyre!(
+                    crate::format_err!(
                         "Failed to serialize {tool_name} tool
     configuration {e}"
                     )
@@ -132,7 +134,7 @@ impl TryFrom<&KdlAgent> for Agent {
             tools_settings.insert(
                 tool_name.to_string(),
                 serde_json::to_value(&tool).map_err(|e| {
-                    eyre!(
+                    crate::format_err!(
                         "Failed to serialize {tool_name} tool
     configuration {e}"
                     )
@@ -145,7 +147,7 @@ impl TryFrom<&KdlAgent> for Agent {
             tools_settings.insert(
                 tool_name.to_string(),
                 serde_json::to_value(&tool).map_err(|e| {
-                    eyre!(
+                    crate::format_err!(
                         "Failed to serialize {tool_name} tool
     configuration {e}"
                     )

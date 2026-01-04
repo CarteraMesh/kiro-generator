@@ -10,7 +10,7 @@ use {
     crate::Fs,
     facet::Facet,
     facet_kdl as kdl,
-    miette::IntoDiagnostic,
+    miette::{GraphicalReportHandler, GraphicalTheme, IntoDiagnostic},
     std::{
         collections::{HashMap, HashSet},
         fmt::{Debug, Display},
@@ -19,6 +19,7 @@ use {
 };
 
 pub(crate) type ConfigResult<T> = miette::Result<T>;
+
 #[derive(Facet, Debug, Default, PartialEq, Clone, Eq, Hash)]
 #[facet(default)]
 pub(super) struct GenericItem {
@@ -38,6 +39,65 @@ impl AsRef<str> for GenericItem {
     }
 }
 
+#[derive(Facet, Debug, Default, PartialEq, Clone, Eq)]
+#[facet(default)]
+pub(super) struct GenericItemList {
+    #[facet(kdl::arguments)]
+    pub item: HashSet<String>,
+}
+
+impl Display for GenericItemList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.item)
+    }
+}
+
+impl AsRef<HashSet<String>> for GenericItemList {
+    fn as_ref(&self) -> &HashSet<String> {
+        &self.item
+    }
+}
+
+impl GenericItemList {
+    fn len(&self) -> usize {
+        self.item.len()
+    }
+}
+
+#[derive(Facet, Debug, Default, PartialEq, Clone, Eq)]
+#[facet(default)]
+pub(super) struct GenericVec {
+    #[facet(kdl::arguments)]
+    pub item: Vec<String>,
+}
+
+impl Display for GenericVec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.item)
+    }
+}
+
+impl AsRef<Vec<String>> for GenericVec {
+    fn as_ref(&self) -> &Vec<String> {
+        &self.item
+    }
+}
+
+impl From<GenericVec> for HashMap<String, String> {
+    fn from(list: GenericVec) -> HashMap<String, String> {
+        list.item
+            .chunks_exact(2)
+            .map(|chunk| (chunk[0].clone(), chunk[1].clone()))
+            .collect()
+    }
+}
+
+impl GenericVec {
+    fn len(&self) -> usize {
+        self.item.len()
+    }
+}
+
 #[derive(Facet, Copy, Default, Clone, Debug, PartialEq, Eq)]
 #[facet(default)]
 pub(super) struct IntDoc {
@@ -50,6 +110,15 @@ impl AsRef<u64> for IntDoc {
     }
 }
 
+fn print_error(name: &str, e: &facet_kdl::KdlDeserializeError) {
+    // let d = e.into_diagnostics();
+    eprintln!("\n=== Miette render ===");
+    let mut output = String::new();
+    let handler = GraphicalReportHandler::new_themed(GraphicalTheme::unicode());
+    handler.render_report(&mut output, e).unwrap();
+    eprintln!("{}", output);
+}
+
 pub(super) fn split_newline(list: Vec<GenericItem>) -> HashSet<String> {
     list.iter()
         .flat_map(|f| f.item.split('\n'))
@@ -59,22 +128,32 @@ pub(super) fn split_newline(list: Vec<GenericItem>) -> HashSet<String> {
         .collect()
 }
 
-pub fn kdl_parse_path<'facet: 'shape, 'shape, T>(
-    fs: &Fs,
-    content: impl AsRef<Path>,
-) -> ConfigResult<T>
+pub fn kdl_parse_path<T>(fs: &Fs, path: impl AsRef<Path>) -> Option<ConfigResult<T>>
 where
-    T: facet::Facet<'facet>,
+    T: for<'a> facet::Facet<'a>,
 {
-    Ok(kdl_parse("")?)
+    if fs.exists(&path) {
+        match fs.read_to_string_sync(&path).into_diagnostic() {
+            Err(e) => Some(Err(e)),
+            Ok(content) => Some(kdl::from_str(&content).into_diagnostic()),
+        }
+    } else {
+        None
+    }
 }
 
-pub fn kdl_parse<'input, 'facet: 'shape, 'shape, T>(content: &'input str) -> ConfigResult<T>
+#[cfg(test)]
+pub(crate) fn kdl_parse<T>(content: &str) -> ConfigResult<T>
 where
-    T: facet::Facet<'facet>,
-    'input: 'facet,
+    T: for<'a> facet::Facet<'a>,
 {
-    kdl::from_str(content).into_diagnostic()
+    match kdl::from_str::<T>(content) {
+        Err(e) => {
+            print_error("test", &e);
+            Err(crate::format_err!("{e}"))
+        }
+        Ok(r) => Ok(r),
+    }
 }
 
 #[derive(facet::Facet, Default)]

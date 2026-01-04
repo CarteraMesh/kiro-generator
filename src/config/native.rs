@@ -1,5 +1,5 @@
 use {
-    super::{GenericItem, split_newline},
+    super::GenericItemList,
     crate::agent::{
         AwsTool as KiroAwsTool,
         ExecuteShellTool as KiroShellTool,
@@ -41,12 +41,12 @@ macro_rules! define_kdl_doc {
         #[derive(Facet, Clone, Debug, Default, PartialEq, Eq)]
         #[facet(default, rename_all = "kebab-case")]
         pub struct $name {
-            #[facet(default, kdl::children)]
-            pub(super) allows: Vec<GenericItem>,
-            #[facet(default, kdl::children)]
-            pub(super) denies: Vec<GenericItem>,
-            #[facet(default, kdl::children)]
-            pub(super) overrides: Vec<GenericItem>,
+            #[facet(default, kdl::child)]
+            pub(super) allows: GenericItemList,
+            #[facet(default, kdl::child)]
+            pub(super) denies: GenericItemList,
+            #[facet(default, kdl::child)]
+            pub(super) overrides: GenericItemList,
             #[facet(default, kdl::property)]
             pub deny_by_default: Option<bool>,
             #[facet(default, kdl::property)]
@@ -60,9 +60,9 @@ macro_rules! define_tool_into {
         impl From<$name> for $to {
             fn from(value: $name) -> $to {
                 $to {
-                    allows: split_newline(value.allows),
-                    denies: split_newline(value.denies),
-                    overrides: split_newline(value.overrides),
+                    allows: value.allows.item,
+                    denies: value.denies.item,
+                    overrides: value.overrides.item,
                     deny_by_default: value.deny_by_default,
                     disable_auto_readonly: value.disable_auto_readonly,
                 }
@@ -85,7 +85,6 @@ define_tool_into!(WriteToolDoc, WriteTool);
 define_tool_into!(ReadToolDoc, ReadTool);
 
 #[derive(Facet, Default, Clone, Debug, PartialEq, Eq)]
-#[facet(default, deny_unknown_fields)]
 pub struct NativeToolsDoc {
     #[facet(default, kdl::child)]
     pub shell: ExecuteShellToolDoc,
@@ -253,12 +252,9 @@ mod tests {
     fn parse_shell_tool() -> ConfigResult<()> {
         let kdl = r#"
             shell deny-by-default=#true disable-auto-readonly=#false {
-                allow """
-                ls .*
-                git status
-                """
-                deny "rm -rf /"
-                override "git push"
+                allows "ls .*" "git status"
+                denies "rm -rf /"
+                overrides "git push"
             }
         "#;
 

@@ -1,36 +1,19 @@
 use {
-    super::IntDoc,
-    crate::{agent::CustomToolConfig, config::GenericItem},
+    crate::{
+        agent::CustomToolConfig,
+        config::{GenericItemList, GenericVec},
+    },
     facet::Facet,
     facet_kdl as kdl,
+    std::collections::HashMap,
 };
 
 #[derive(Facet, Clone, Debug)]
-struct EnvVar {
+struct KeyVal {
     #[facet(kdl::argument)]
     key: String,
     #[facet(kdl::argument)]
     value: String,
-}
-
-#[derive(Facet, Clone, Debug)]
-struct Header {
-    #[facet(kdl::argument)]
-    key: String,
-    #[facet(kdl::argument)]
-    value: String,
-}
-
-#[derive(Facet, Clone, Debug, Eq, PartialEq)]
-pub struct RedirectUri {
-    #[facet(kdl::argument)]
-    pub value: String,
-}
-
-#[derive(Facet, Clone, Debug)]
-pub struct Disabled {
-    #[facet(kdl::argument)]
-    pub value: bool,
 }
 
 #[derive(Facet, Default, Clone, Debug)]
@@ -40,56 +23,41 @@ pub struct CustomToolConfigDoc {
     pub name: String,
 
     #[facet(kdl::child, default)]
-    pub url: Option<Url>,
+    pub url: String,
 
     #[facet(kdl::child, default)]
-    pub command: Option<Command>,
-
-    #[facet(kdl::children, default)]
-    args: Vec<GenericItem>,
-
-    #[facet(kdl::children, default)]
-    env: Vec<EnvVar>,
-
-    #[facet(kdl::children, default)]
-    header: Vec<Header>,
+    pub command: String,
 
     #[facet(kdl::child, default)]
-    pub(super) timeout: IntDoc,
+    args: GenericItemList,
 
     #[facet(kdl::child, default)]
-    pub disabled: Option<Disabled>,
-}
+    env: GenericVec,
 
-#[derive(Facet, Clone, Debug)]
-pub struct Url {
-    #[facet(kdl::argument)]
-    pub value: String,
-}
+    #[facet(kdl::child, default)]
+    header: GenericVec,
 
-#[derive(Facet, Clone, Debug)]
-pub struct Command {
-    #[facet(kdl::argument)]
-    pub value: String,
+    #[facet(kdl::child, default)]
+    pub(super) timeout: u64,
+
+    #[facet(kdl::property, default)]
+    pub disabled: bool,
 }
 
 impl From<CustomToolConfigDoc> for CustomToolConfig {
     fn from(value: CustomToolConfigDoc) -> Self {
-        let command = value.command.map(|c| c.value).unwrap_or_default();
-        let url = value.url.map(|u| u.value).unwrap_or_default();
-
         Self {
-            url,
-            command,
-            args: value.args.into_iter().map(|v| v.item).collect(),
-            timeout: if value.timeout.value == 0 {
+            url: value.url,
+            command: value.command,
+            args: value.args.item.into_iter().collect(),
+            timeout: if value.timeout == 0 {
                 crate::agent::tool_default_timeout()
             } else {
-                value.timeout.value
+                value.timeout
             },
-            disabled: value.disabled.map(|d| d.value).unwrap_or(false),
-            headers: value.header.into_iter().map(|h| (h.key, h.value)).collect(),
-            env: value.env.into_iter().map(|e| (e.key, e.value)).collect(),
+            disabled: value.disabled,
+            headers: value.header.into(),
+            env: value.env.into(),
         }
     }
 }
@@ -102,7 +70,11 @@ impl From<&CustomToolConfigDoc> for CustomToolConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use {
+        super::*,
+        crate::config::{ConfigResult, kdl_parse},
+        indoc::indoc,
+    };
 
     #[derive(Facet, Debug)]
     struct McpDoc {
@@ -111,31 +83,35 @@ mod tests {
     }
 
     #[test]
-    fn parse_basic_mcp() {
-        let kdl = r#"mcp "rustdocs" {
-            command "rust-docs-mcp"
-            timeout 1000
-        }"#;
+    fn parse_basic_mcp() -> ConfigResult<()> {
+        let kdl = indoc! {
+            r#"mcp "rustdocs" {
+              command "rust-docs-mcp"
+              timeout 1000
+        }"#
+        };
 
-        let doc: McpDoc = facet_kdl::from_str(kdl).unwrap();
+        let doc: McpDoc = kdl_parse(kdl)?;
         assert_eq!(doc.mcp.name, "rustdocs");
-        assert_eq!(doc.mcp.command.unwrap().value, "rust-docs-mcp");
-        assert_eq!(doc.mcp.timeout.value, 1000);
+        assert_eq!(doc.mcp.command, "rust-docs-mcp");
+        assert_eq!(doc.mcp.timeout, 1000);
+        Ok(())
     }
 
     #[test]
-    fn parse_mcp_with_url() {
+    fn parse_mcp_with_url() -> ConfigResult<()> {
         let kdl = r#"mcp "remote" {
             url "http://localhost:8080"
         }"#;
 
-        let doc: McpDoc = facet_kdl::from_str(kdl).unwrap();
+        let doc: McpDoc = facet_kdl::from_str(kdl)?;
         assert_eq!(doc.mcp.name, "remote");
-        assert_eq!(doc.mcp.url.unwrap().value, "http://localhost:8080");
+        assert_eq!(doc.mcp.url, "http://localhost:8080");
+        Ok(())
     }
 
     #[test]
-    fn parse_mcp_with_env_and_headers() {
+    fn parse_mcp_with_env_and_headers() -> ConfigResult<()> {
         let kdl = r#"mcp "api" {
             command "api-server"
             env "API_KEY" "secret123"
@@ -143,50 +119,63 @@ mod tests {
             header "Authorization" "Bearer token"
             header "Content-Type" "application/json"
         }"#;
+        let doc: McpDoc = facet_kdl::from_str(kdl)?;
+        assert_eq!(doc.mcp.env.len(), 4);
+        assert_eq!(doc.mcp.header.len(), 4);
 
-        let doc: McpDoc = facet_kdl::from_str(kdl).unwrap();
-        assert_eq!(doc.mcp.env.len(), 2);
-        assert_eq!(doc.mcp.header.len(), 2);
+        let env: HashMap<String, String> = doc.mcp.env.into();
+        assert_eq!(env.len(), 2);
+        assert_eq!(env.get("API_KEY"), Some(&"secret123".to_string()));
+        assert_eq!(env.get("DEBUG"), Some(&"true".to_string()));
+
+        let header: HashMap<String, String> = doc.mcp.header.into();
+        assert_eq!(header.len(), 2);
+        assert_eq!(header.get("Authorization"), Some(&"Bearer token".to_string()));
+        assert_eq!(header.get("Content-Type"), Some(&"application/json".to_string()));
+        Ok(())
     }
 
     #[test]
-    fn parse_mcp_with_args() {
-        let kdl = r#"mcp "tool" {
+    fn parse_mcp_with_args() -> ConfigResult<()> {
+        let kdl = indoc! { r#"mcp "tool" {
             command "my-tool"
-            args "--verbose" "--output" "json"
-        }"#;
+            args "--verbose" "--output=json"
+        }"#
+        };
 
-        let doc: McpDoc = facet_kdl::from_str(kdl).unwrap();
-        let args: Vec<String> = doc.mcp.args.into_iter().map(|v| v.item).collect();
-        assert_eq!(args, vec!["--verbose", "--output", "json"]);
+        let doc: McpDoc = kdl_parse(kdl)?;
+        let args: Vec<String> = doc.mcp.args.item.into_iter().collect();
+        assert_eq!(args, vec!["--verbose", "--output=json"]);
+        Ok(())
     }
 
     #[test]
-    fn convert_to_custom_tool_config() {
-        let kdl = r#"mcp "test" {
+    fn convert_to_custom_tool_config() -> ConfigResult<()> {
+        let kdl = r#"mcp "test" disabled=#true {
             command "test-cmd"
             timeout 5000
-            disabled #true
         }"#;
 
-        let doc: McpDoc = facet_kdl::from_str(kdl).unwrap();
+        let doc: McpDoc = facet_kdl::from_str(kdl)?;
         let config: CustomToolConfig = doc.mcp.into();
 
         assert_eq!(config.command, "test-cmd");
         assert_eq!(config.timeout, 5000);
         assert!(config.disabled);
+        Ok(())
     }
 
     #[test]
-    fn default_timeout_when_zero() {
+    fn default_timeout_when_zero() -> ConfigResult<()> {
         let kdl = r#"mcp "test" {
             command "test-cmd"
             timeout 0
         }"#;
 
-        let doc: McpDoc = facet_kdl::from_str(kdl).unwrap();
+        let doc: McpDoc = facet_kdl::from_str(kdl)?;
         let config: CustomToolConfig = doc.mcp.into();
 
         assert_eq!(config.timeout, crate::agent::tool_default_timeout());
+        Ok(())
     }
 }

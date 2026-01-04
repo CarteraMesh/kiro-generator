@@ -10,7 +10,7 @@ impl Generator {
         visited: &mut HashSet<String>,
     ) -> Result<Vec<String>> {
         if visited.contains(&agent.name) {
-            return Err(color_eyre::eyre::eyre!(
+            return Err(crate::format_err!(
                 "Circular inheritance detected: {} already in chain",
                 agent.name
             ));
@@ -23,7 +23,7 @@ impl Generator {
                 .resolved
                 .agents
                 .get(parent_name)
-                .ok_or_else(|| color_eyre::eyre::eyre!("Agent '{parent_name}' not found"))?;
+                .ok_or_else(|| crate::format_err!("Agent '{parent_name}' not found"))?;
 
             let parent_chain = self.resolve_transitive_inheritance(parent, visited)?;
             for p in parent_chain {
@@ -54,9 +54,10 @@ impl Generator {
 
             let mut merged = agent.clone();
             for parent_name in parents.iter().rev() {
-                let parent = self.resolved.agents.get(parent_name).ok_or_else(|| {
-                    color_eyre::eyre::eyre!("Parent agent '{parent_name}' not found")
-                })?;
+                let parent =
+                    self.resolved.agents.get(parent_name).ok_or_else(|| {
+                        crate::format_err!("Parent agent '{parent_name}' not found")
+                    })?;
                 merged = merged.merge(parent.clone());
             }
 

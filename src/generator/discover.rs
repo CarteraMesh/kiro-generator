@@ -1,22 +1,17 @@
 use {
     super::*,
     crate::config::{GeneratorConfig, GeneratorConfigDoc, KdlAgent, KdlAgentDoc},
-    miette::IntoDiagnostic,
     std::{fmt::Display, ops::Deref, path::Path},
 };
 
 pub fn load_inline(fs: &Fs, path: impl AsRef<Path>) -> Result<GeneratorConfig> {
-    if fs.exists(&path) {
-        let content = fs
-            .read_to_string_sync(&path)
-            .wrap_err_with(|| format!("failed to read path '{}'", path.as_ref().display()))?;
-
-        let doc: GeneratorConfigDoc = facet_kdl::from_str(&content)
-            .into_diagnostic()
-            .map_err(|e| eyre!("failed to parse from {} err:{e}", path.as_ref().display()))?;
-        Ok(doc.into())
-    } else {
-        Ok(GeneratorConfig::default())
+    let doc: Option<Result<GeneratorConfigDoc>> = crate::config::kdl_parse_path(fs, path);
+    match doc {
+        None => Ok(GeneratorConfig::default()),
+        Some(d) => {
+            let d = d?;
+            Ok(d.into())
+        }
     }
 }
 

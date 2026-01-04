@@ -4,7 +4,8 @@ resource "file://AGENTS.md"
 resource "file://README.md"
 native-tool {
    aws {
-       allow "ec2" "s3"
+       allow "ec2"
+       allow "s3"
    }
 }
 mcp "awsdocs" {

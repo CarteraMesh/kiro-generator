@@ -9,7 +9,6 @@ use {
         agent::{CustomToolConfig, OriginalToolName},
         config::split_newline,
     },
-    color_eyre::eyre::WrapErr,
     facet::Facet,
     facet_kdl as kdl,
     std::{
@@ -45,18 +44,20 @@ struct Json {
 impl ToolSetting {
     #[allow(dead_code)]
     fn to_value(&self) -> crate::Result<(String, serde_json::Value)> {
-        let v: serde_json::Value = serde_json::from_str(&self.json.value)
-            .wrap_err_with(|| format!("Failed to parse JSON for tool-setting '{}'", self.name))?;
-
-        if !v.is_object() {
-            return Err(color_eyre::eyre::eyre!(
-                "tool-setting '{}' must be a JSON object, got: {}",
-                self.name,
-                v
-            ));
-        }
-
-        Ok((self.name.clone(), v))
+        todo!()
+        // let v: serde_json::Value = serde_json::from_str(&self.json.value)
+        //     .wrap_err_with(|| format!("Failed to parse JSON for tool-setting
+        // '{}'", self.name))?;
+        //
+        // if !v.is_object() {
+        //     return Err(crate::format_err!(
+        //         "tool-setting '{}' must be a JSON object, got: {}",
+        //         self.name,
+        //         v
+        //     ));
+        // }
+        //
+        // Ok((self.name.clone(), v))
     }
 }
 

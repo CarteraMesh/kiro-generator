@@ -5,7 +5,7 @@ use {
         config::KdlAgent,
         os::Fs,
     },
-    color_eyre::eyre::{Context, eyre},
+    miette::{Context, IntoDiagnostic},
     serde::Serialize,
     std::{
         collections::{HashMap, HashSet},
@@ -155,7 +155,8 @@ impl Generator {
             self.fs
                 .create_dir_all(&result.destination)
                 .await
-                .with_context(|| {
+                .into_diagnostic()
+                .wrap_err_with(|| {
                     format!(
                         "failed to create directory {}",
                         result.destination.display()
@@ -168,9 +169,13 @@ impl Generator {
                 .join(format!("{}.json", result.agent.name));
 
             self.fs
-                .write(&out, serde_json::to_string_pretty(&result.kiro_agent)?)
+                .write(
+                    &out,
+                    serde_json::to_string_pretty(&result.kiro_agent).into_diagnostic()?,
+                )
                 .await
-                .with_context(|| format!("failed to write file {}", out.display()))?;
+                .into_diagnostic()
+                .wrap_err_with(|| format!("failed to write file {}", out.display()))?;
         }
         Ok(result)
     }

@@ -6,6 +6,7 @@ use {
         source::KdlSources,
     },
     colored::Colorize,
+    miette::{Context, IntoDiagnostic},
     std::fmt::Display,
     super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
     tracing::enabled,
@@ -289,7 +290,12 @@ impl OutputFormat {
             }
             Self::Json => {
                 let kiro_agents: Vec<Agent> = results.into_iter().map(|a| a.kiro_agent).collect();
-                println!("{}", serde_json::to_string_pretty(&kiro_agents)?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&kiro_agents)
+                        .into_diagnostic()
+                        .wrap_err("todo")?
+                );
                 Ok(())
             }
         }

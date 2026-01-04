@@ -1,5 +1,4 @@
 use {
-    super::IntDoc,
     crate::agent::hook::{Hook, HookTrigger},
     facet::Facet,
     facet_kdl as kdl,
@@ -14,24 +13,24 @@ macro_rules! define_hook_doc {
             #[facet(kdl::argument)]
             pub name: String,
             #[facet(kdl::child, default)]
-            command: GenericValue,
-            #[facet(default, kdl::child)]
-            timeout_ms: IntDoc,
+            command: String,
+            #[facet(kdl::child, default, rename = "timeout-ms")]
+            timeout_ms: u64,
+            #[facet(kdl::child, default, rename = "max-output-size")]
+            max_output_size: u64,
+            #[facet(kdl::child, default, rename = "cache-ttl")]
+            cache_ttl_seconds: u64,
             #[facet(kdl::child, default)]
-            max_output_size: IntDoc,
-            #[facet(kdl::child, default)]
-            cache_ttl_seconds: IntDoc,
-            #[facet(kdl::child, default)]
-            matcher: Option<GenericValue>,
+            matcher: Option<String>,
         }
         impl From<$name> for Hook {
             fn from(value: $name) -> Hook {
                 Hook {
-                    command: value.command.value,
-                    timeout_ms: value.timeout_ms.value,
-                    max_output_size: value.max_output_size.value,
-                    cache_ttl_seconds: value.cache_ttl_seconds.value,
-                    matcher: value.matcher.map(|m| m.value),
+                    command: value.command,
+                    timeout_ms: value.timeout_ms,
+                    max_output_size: value.max_output_size,
+                    cache_ttl_seconds: value.cache_ttl_seconds,
+                    matcher: value.matcher,
                 }
             }
         }
@@ -52,15 +51,14 @@ define_hook_doc!(HookPostToolUseDoc);
 define_hook_doc!(HookStopDoc);
 
 #[derive(Facet, Clone, Default, Debug, PartialEq, Eq)]
-#[facet(default, rename_all = "kebab-case")]
 pub struct HookDoc {
-    #[facet(kdl::children, default)]
+    #[facet(kdl::children, default, rename = "agent-spawn")]
     pub agent_spawn: Vec<HookAgentSpawnDoc>,
-    #[facet(kdl::children, default)]
+    #[facet(kdl::children, default, rename = "user-prompt-submit")]
     pub user_prompt_submit: Vec<HookUserPromptSubmitDoc>,
-    #[facet(kdl::children, default)]
+    #[facet(kdl::children, default, rename = "pre-tool-use")]
     pub pre_tool_use: Vec<HookPreToolUseDoc>,
-    #[facet(kdl::children, default)]
+    #[facet(kdl::children, default, rename = "post-tool-use")]
     pub post_tool_use: Vec<HookPostToolUseDoc>,
     #[facet(kdl::children, default)]
     pub stop: Vec<HookStopDoc>,
@@ -149,7 +147,11 @@ fn merge_hooks(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::Result, std::time::Duration};
+    use {
+        super::*,
+        crate::{Result, config::kdl_parse},
+        std::time::Duration,
+    };
 
     fn rando() -> HashMap<String, Hook> {
         let value = std::time::SystemTime::now()
@@ -206,7 +208,7 @@ mod tests {
                 cache-ttl-seconds 0
             }
         "#;
-        let doc: HookDoc = facet_kdl::from_str(kdl)?;
+        let doc: HookDoc = kdl_parse(kdl)?;
         let doc = HookPart::from(doc);
 
         assert_eq!(1, doc.agent_spawn.len());
