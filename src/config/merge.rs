@@ -44,10 +44,10 @@ mod tests {
                tool "shell"
                native-tool {
                   write {
-                    override  "Cargo.lock"
+                    overrides  "Cargo.lock"
                   }
                   shell {
-                    override  "git push .*"
+                    overrides  "git push .*"
                   }
                }
                hook {
@@ -72,20 +72,17 @@ mod tests {
                 alias "fs_read" "read"
                 native-tool {
                   read {
-                      allow "./src/*" 
-                      allow "./scripts/**"
-                      deny  "Cargo.lock"
+                      allows "./src/*"  "./scripts/**"
+                      denies "Cargo.lock"
                   }
                    write {
-                       allow "./src/*" 
-                       allow "./scripts/**"
-                       deny  "Cargo.lock"
+                       allows "./src/*"  "./scripts/**"
+                       denies "Cargo.lock"
                    }
                
                   shell {
-                      allow "git status .*"
-                      allow "git pull .*"
-                      deny  "git push .*"
+                      allows "git status .*" "git pull .*"
+                      denies "git push .*"
                    }
                 }
                hook {

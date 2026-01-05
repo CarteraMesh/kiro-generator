@@ -6,7 +6,7 @@ use {
         mcp::CustomToolConfigDoc,
         native::NativeToolsDoc,
     },
-    crate::Fs,
+    crate::{Fs, config::GenericVec},
     facet::Facet,
     facet_kdl as kdl,
     miette::{Context, IntoDiagnostic},
@@ -48,7 +48,7 @@ pub struct KdlAgentFileDoc {
     #[facet(kdl::children, default)]
     pub(super) mcp: Vec<CustomToolConfigDoc>,
     #[facet(kdl::children, default)]
-    pub(super) alias: Vec<ToolAliasKdl>,
+    pub(super) alias: Vec<GenericVec>,
     #[facet(kdl::child, default)]
     pub native_tool: NativeToolsDoc,
     #[facet(kdl::children, default)]

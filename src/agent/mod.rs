@@ -2,7 +2,6 @@ mod custom_tool;
 pub mod hook;
 mod mcp_config;
 pub mod tools;
-mod wrapper_types;
 pub const DEFAULT_AGENT_RESOURCES: &[&str] = &["file://README.md", "file://AGENTS.md"];
 pub const DEFAULT_APPROVE: [&str; 0] = [];
 use {
@@ -19,7 +18,6 @@ pub use {
     custom_tool::{CustomToolConfig, tool_default_timeout},
     mcp_config::McpServerConfig,
     tools::*,
-    wrapper_types::OriginalToolName,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -47,7 +45,7 @@ pub struct Agent {
     pub tools: HashSet<String>,
     /// Tool aliases for remapping tool names
     #[serde(default)]
-    pub tool_aliases: HashMap<OriginalToolName, String>,
+    pub tool_aliases: HashMap<String, String>,
     /// List of tools the agent is explicitly allowed to use
     #[serde(default)]
     pub allowed_tools: HashSet<String>,

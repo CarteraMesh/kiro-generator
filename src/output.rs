@@ -6,11 +6,18 @@ use {
         source::KdlSources,
     },
     colored::Colorize,
-    miette::{Context, IntoDiagnostic},
+    miette::{Context, GraphicalReportHandler, GraphicalTheme, IntoDiagnostic},
     std::fmt::Display,
     super_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, *},
     tracing::enabled,
 };
+
+pub fn print_error(color: &ColorOverride, e: &facet_kdl::KdlDeserializeError) {
+    let mut output = String::new();
+    let handler = GraphicalReportHandler::new_themed(GraphicalTheme::unicode());
+    handler.render_report(&mut output, e).unwrap();
+    eprintln!("{}", output);
+}
 
 /// Override the color setting. Default is [`ColorOverride::Auto`].
 #[derive(Copy, Clone, Debug, Default, clap::ValueEnum)]

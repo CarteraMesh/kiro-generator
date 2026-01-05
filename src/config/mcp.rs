@@ -1,11 +1,7 @@
 use {
-    crate::{
-        agent::CustomToolConfig,
-        config::{GenericItemList, GenericVec},
-    },
+    crate::{agent::CustomToolConfig, config::GenericVec},
     facet::Facet,
     facet_kdl as kdl,
-    std::collections::HashMap,
 };
 
 #[derive(Facet, Clone, Debug)]
@@ -29,7 +25,7 @@ pub struct CustomToolConfigDoc {
     pub command: String,
 
     #[facet(kdl::child, default)]
-    args: GenericItemList,
+    args: GenericVec,
 
     #[facet(kdl::child, default)]
     env: GenericVec,
@@ -74,6 +70,7 @@ mod tests {
         super::*,
         crate::config::{ConfigResult, kdl_parse},
         indoc::indoc,
+        std::collections::HashMap,
     };
 
     #[derive(Facet, Debug)]
@@ -130,8 +127,14 @@ mod tests {
 
         let header: HashMap<String, String> = doc.mcp.header.into();
         assert_eq!(header.len(), 2);
-        assert_eq!(header.get("Authorization"), Some(&"Bearer token".to_string()));
-        assert_eq!(header.get("Content-Type"), Some(&"application/json".to_string()));
+        assert_eq!(
+            header.get("Authorization"),
+            Some(&"Bearer token".to_string())
+        );
+        assert_eq!(
+            header.get("Content-Type"),
+            Some(&"application/json".to_string())
+        );
         Ok(())
     }
 
@@ -144,8 +147,7 @@ mod tests {
         };
 
         let doc: McpDoc = kdl_parse(kdl)?;
-        let args: Vec<String> = doc.mcp.args.item.into_iter().collect();
-        assert_eq!(args, vec!["--verbose", "--output=json"]);
+        assert_eq!(doc.mcp.args.item, vec!["--verbose", "--output=json"]);
         Ok(())
     }
 

@@ -1,5 +1,5 @@
 use {
-    super::GenericItemList,
+    super::GenericSet,
     crate::agent::{
         AwsTool as KiroAwsTool,
         ExecuteShellTool as KiroShellTool,
@@ -42,11 +42,11 @@ macro_rules! define_kdl_doc {
         #[facet(default, rename_all = "kebab-case")]
         pub struct $name {
             #[facet(default, kdl::child)]
-            pub(super) allows: GenericItemList,
+            pub(super) allows: GenericSet,
             #[facet(default, kdl::child)]
-            pub(super) denies: GenericItemList,
+            pub(super) denies: GenericSet,
             #[facet(default, kdl::child)]
-            pub(super) overrides: GenericItemList,
+            pub(super) overrides: GenericSet,
             #[facet(default, kdl::property)]
             pub deny_by_default: Option<bool>,
             #[facet(default, kdl::property)]
@@ -85,6 +85,7 @@ define_tool_into!(WriteToolDoc, WriteTool);
 define_tool_into!(ReadToolDoc, ReadTool);
 
 #[derive(Facet, Default, Clone, Debug, PartialEq, Eq)]
+#[facet(default)]
 pub struct NativeToolsDoc {
     #[facet(default, kdl::child)]
     pub shell: ExecuteShellToolDoc,
@@ -273,9 +274,8 @@ mod tests {
     fn parse_aws_tool() -> ConfigResult<()> {
         let kdl = r#"
             aws disable-auto-readonly=#true {
-                allow "ec2"
-                allow "s3"
-                deny "iam"
+                allows "ec2" "s3"
+                denies "iam"
             }
         "#;
 
@@ -292,17 +292,14 @@ mod tests {
     fn parse_read_write_tools() -> ConfigResult<()> {
         let kdl = r#"
             read {
-                allow """
-                *.rs
-                *.toml
-                """
-                deny "/etc/*"
-                override "/etc/hosts"
+                allows "*.rs" "*.toml"
+                denies "/etc/*"
+                overrides "/etc/hosts"
             }
             write {
-                allow "*.txt"
-                deny "/tmp/*"
-                override "/tmp/allowed"
+                allows "*.txt"
+                denies "/tmp/*"
+                overrides "/tmp/allowed"
             }
         "#;
 

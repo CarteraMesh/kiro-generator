@@ -6,8 +6,8 @@ use {
         native::{AwsTool, ExecuteShellTool, NativeTools, NativeToolsDoc, ReadTool, WriteTool},
     },
     crate::{
-        agent::{CustomToolConfig, OriginalToolName},
-        config::split_newline,
+        agent::CustomToolConfig,
+        config::{GenericVec, split_newline},
     },
     facet::Facet,
     facet_kdl as kdl,
@@ -75,7 +75,7 @@ pub struct KdlAgent {
     pub model: Option<String>,
     pub hook: HookPart,
     pub mcp: HashMap<String, CustomToolConfig>,
-    pub alias: HashMap<OriginalToolName, String>,
+    pub alias: HashMap<String, String>,
     pub native_tool: NativeTools,
     pub tool_setting: Vec<ToolSetting>,
 }
@@ -120,7 +120,7 @@ pub struct KdlAgentDoc {
     pub(super) mcp: Vec<CustomToolConfigDoc>,
 
     #[facet(kdl::children, default)]
-    pub(super) alias: Vec<ToolAliasKdl>,
+    pub(super) alias: Vec<GenericVec>,
 
     #[facet(kdl::child, default)]
     pub native_tool: NativeToolsDoc,
@@ -212,11 +212,13 @@ impl KdlAgentDoc {
         self.template.is_some_and(|f| f)
     }
 
-    pub fn tool_aliases(&self) -> HashMap<OriginalToolName, String> {
-        self.alias
-            .iter()
-            .map(|m| (OriginalToolName(m.from.clone()), m.to.clone()))
-            .collect()
+    pub fn tool_aliases(&self) -> HashMap<String, String> {
+        let mut map: HashMap<String, String> = HashMap::new();
+        for a in &self.alias {
+            let m = HashMap::from(a.clone());
+            map.extend(m);
+        }
+        map
     }
 
     pub fn hooks(&self) -> HookPart {

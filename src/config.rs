@@ -41,28 +41,30 @@ impl AsRef<str> for GenericItem {
 
 #[derive(Facet, Debug, Default, PartialEq, Clone, Eq)]
 #[facet(default)]
-pub(super) struct GenericItemList {
+pub(super) struct GenericSet {
     #[facet(kdl::arguments)]
     pub item: HashSet<String>,
 }
 
-impl Display for GenericItemList {
+impl Display for GenericSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.item)
     }
 }
 
-impl AsRef<HashSet<String>> for GenericItemList {
+impl AsRef<HashSet<String>> for GenericSet {
     fn as_ref(&self) -> &HashSet<String> {
         &self.item
     }
 }
 
-impl GenericItemList {
-    fn len(&self) -> usize {
-        self.item.len()
-    }
-}
+// #[cfg(test)]
+// impl GenericSet {
+//     #[cfg(test)]
+//     fn len(&self) -> usize {
+//         self.item.len()
+//     }
+// }
 
 #[derive(Facet, Debug, Default, PartialEq, Clone, Eq)]
 #[facet(default)]
