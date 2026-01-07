@@ -112,7 +112,8 @@ impl AsRef<u64> for IntDoc {
     }
 }
 
-fn print_error(name: &str, e: &facet_kdl::KdlDeserializeError) {
+#[cfg(test)]
+fn print_error(e: &facet_kdl::KdlDeserializeError) {
     // let d = e.into_diagnostics();
     eprintln!("\n=== Miette render ===");
     let mut output = String::new();
@@ -151,7 +152,7 @@ where
 {
     match kdl::from_str::<T>(content) {
         Err(e) => {
-            print_error("test", &e);
+            print_error(&e);
             Err(crate::format_err!("{e}"))
         }
         Ok(r) => Ok(r),

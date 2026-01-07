@@ -7,7 +7,7 @@ use {
     },
     crate::{
         agent::CustomToolConfig,
-        config::{GenericVec, split_newline},
+        config::{GenericSet, GenericVec, split_newline},
     },
     facet::Facet,
     facet_kdl as kdl,
@@ -90,13 +90,13 @@ pub struct KdlAgentDoc {
     pub template: Option<bool>,
 
     #[facet(kdl::child, default)]
-    pub(super) description: Option<GenericItem>,
-
-    #[facet(kdl::children, default)]
-    pub(super) inherits: Vec<GenericItem>,
+    pub(super) description: Option<String>,
 
     #[facet(kdl::child, default)]
-    pub(super) prompt: Option<GenericItem>,
+    pub(super) inherits: GenericSet,
+
+    #[facet(kdl::child, default)]
+    pub(super) prompt: Option<String>,
 
     #[facet(kdl::children, default)]
     pub(super) resources: Vec<GenericItem>,
@@ -104,14 +104,14 @@ pub struct KdlAgentDoc {
     #[facet(kdl::property, default)]
     pub include_mcp_json: Option<bool>,
 
-    #[facet(kdl::children, rename = "tools", default)]
-    pub(super) tools: Vec<GenericItem>,
-
-    #[facet(kdl::children, rename = "allowed_tools", default)]
-    pub(super) allowed_tools: Vec<GenericItem>,
+    #[facet(kdl::child, rename = "tools", default)]
+    pub(super) tools: GenericSet,
 
     #[facet(kdl::child, default)]
-    pub(super) model: Option<GenericItem>,
+    pub(super) allowed_tools: GenericSet,
+
+    #[facet(kdl::child, default)]
+    pub(super) model: Option<String>,
 
     #[facet(kdl::child, default)]
     pub(super) hook: Option<HookDoc>,
@@ -145,8 +145,8 @@ impl From<KdlAgentDoc> for KdlAgent {
     fn from(value: KdlAgentDoc) -> Self {
         Self {
             name: value.name.clone(),
-            description: value.description.as_ref().map(|f| f.item.clone()),
-            prompt: value.prompt.as_ref().map(|f| f.item.clone()),
+            description: value.description.clone(),
+            prompt: value.prompt.clone(),
             alias: value.tool_aliases(),
             allowed_tools: value.allowed_tools(),
             inherits: value.inherits(),
@@ -154,7 +154,7 @@ impl From<KdlAgentDoc> for KdlAgent {
             include_mcp_json: value.include_mcp_json,
             hook: value.hooks(),
             resources: value.resources(),
-            model: value.model.as_ref().map(|f| f.item.clone()),
+            model: value.model.clone(),
             mcp: value.mcp_servers(),
             tools: value.tools(),
             tool_setting: Default::default(), // TODO use facet::Value
@@ -194,11 +194,11 @@ impl KdlAgent {
 
 impl KdlAgentDoc {
     pub fn prompt(&self) -> String {
-        self.prompt.clone().unwrap_or_default().item
+        self.prompt.clone().unwrap_or_default()
     }
 
     pub fn description(&self) -> String {
-        self.description.clone().unwrap_or_default().item
+        self.description.clone().unwrap_or_default()
     }
 
     pub fn new(name: impl AsRef<str>) -> Self {
@@ -226,15 +226,15 @@ impl KdlAgentDoc {
     }
 
     pub fn allowed_tools(&self) -> HashSet<String> {
-        split_newline(self.allowed_tools.clone())
+        self.allowed_tools.item.clone()
     }
 
     pub fn tools(&self) -> HashSet<String> {
-        split_newline(self.tools.clone())
+        self.tools.item.clone()
     }
 
     pub fn inherits(&self) -> HashSet<String> {
-        split_newline(self.inherits.clone())
+        self.inherits.item.clone()
     }
 
     pub fn resources(&self) -> HashSet<String> {

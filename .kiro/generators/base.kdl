@@ -1,13 +1,9 @@
 description "Default agent for Kiro"
-tools *
-allowed-tools "read"
-allowed-tools "knowledge"
-allowed-tools "fetch"
+tools "*"
+allowed-tools "read" "knowledge" "fetch"
 resource "file://README.md"
 resource "file://.amazonq/rules/**/*.md"
-
-alias "execute_shell" bash
-
+alias "execute_shell" "bash"
 hook {
     agent-spawn echo {
         command "echo My name is Bob"
@@ -15,49 +11,24 @@ hook {
         cache-ttl-seconds 300
     }
 }
-
 native-tool {
     read {
-        deny .*Cargo.toml.*
-        deny .*yarn.lock.*
+        denies ".*Cargo.toml.*" ".*yarn.lock.*"
     }
     write {
-        deny .*Cargo.toml.*
+        denies ".*Cargo.toml.*"
     }
     shell {
-        allow """
-        git status
-        git fetch
-         git diff .*
-          git pull.*
-          yarn.*
-          pulumi preview .*
-          kubectl .*
-          pdf2.*
-          ps .*
-          timeout.*
-          pgrep.*
-        """
-        deny """
-        git commit .*
-        git push .*
-        kubectl .*delete*
-        .*delete.*
-        pulumi up.*
-        ^rm .*
-        .*destroy.*
-        .*rollout.*
-        .*kill.*
-        """
+        allows "git status" "git fetch" "git diff .*" "git pull.*" "yarn.*" "pulumi preview .*" "pdf2.*" "ps .*" "timeout.*" "pgrep.*"
+        denies "git commit .*" "git push .*" "kubectl .*delete*" ".*delete.*" "pulumi up.*" "^rm .*" ".*destroy.*" ".*rollout.*" ".*kill.*"
     }
 }
 mcp rustdocs {
-    command mcp-docsrs
+    command "mcp-docsrs"
     timeout 1200
 }
 mcp cargo {
-    command cargo-mcp
+    command "cargo-mcp"
     args "--debug"
     timeout 120000
 }
-
