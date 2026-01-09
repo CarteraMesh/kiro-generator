@@ -193,25 +193,6 @@ impl KdlAgent {
 }
 
 impl KdlAgentDoc {
-    pub fn prompt(&self) -> String {
-        self.prompt.clone().unwrap_or_default()
-    }
-
-    pub fn description(&self) -> String {
-        self.description.clone().unwrap_or_default()
-    }
-
-    pub fn new(name: impl AsRef<str>) -> Self {
-        Self {
-            name: name.as_ref().to_string(),
-            ..Default::default()
-        }
-    }
-
-    pub fn is_template(&self) -> bool {
-        self.template.is_some_and(|f| f)
-    }
-
     pub fn tool_aliases(&self) -> HashMap<String, String> {
         let mut map: HashMap<String, String> = HashMap::new();
         for a in &self.alias {

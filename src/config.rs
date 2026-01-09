@@ -13,7 +13,7 @@ use {
     miette::IntoDiagnostic,
     std::{
         collections::{HashMap, HashSet},
-        fmt::{Debug, Display},
+        fmt::Debug,
         path::Path,
     },
 };
@@ -27,18 +27,6 @@ pub(super) struct GenericItem {
     pub item: String,
 }
 
-impl Display for GenericItem {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.item)
-    }
-}
-
-impl AsRef<str> for GenericItem {
-    fn as_ref(&self) -> &str {
-        self.item.as_ref()
-    }
-}
-
 #[derive(Facet, Debug, Default, PartialEq, Clone, Eq)]
 #[facet(default)]
 pub(super) struct GenericSet {
@@ -46,35 +34,11 @@ pub(super) struct GenericSet {
     pub item: HashSet<String>,
 }
 
-impl Display for GenericSet {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.item)
-    }
-}
-
-impl AsRef<HashSet<String>> for GenericSet {
-    fn as_ref(&self) -> &HashSet<String> {
-        &self.item
-    }
-}
-
 #[derive(Facet, Debug, Default, PartialEq, Clone, Eq)]
 #[facet(default)]
 pub(super) struct GenericVec {
     #[facet(kdl::arguments)]
     pub item: Vec<String>,
-}
-
-impl Display for GenericVec {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.item)
-    }
-}
-
-impl AsRef<Vec<String>> for GenericVec {
-    fn as_ref(&self) -> &Vec<String> {
-        &self.item
-    }
 }
 
 impl From<GenericVec> for HashMap<String, String> {
@@ -98,11 +62,6 @@ impl GenericVec {
 pub(super) struct IntDoc {
     #[facet(kdl::argument)]
     pub value: u64,
-}
-impl AsRef<u64> for IntDoc {
-    fn as_ref(&self) -> &u64 {
-        &self.value
-    }
 }
 
 #[cfg(test)]

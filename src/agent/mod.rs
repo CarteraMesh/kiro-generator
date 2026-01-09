@@ -225,3 +225,23 @@ impl Default for Agent {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_agent() -> crate::Result<()> {
+        let agent = Agent {
+            name: "test".to_string(),
+            ..Default::default()
+        };
+        assert_eq!("test", format!("{agent}"));
+
+        let kg_agent = KdlAgent::default();
+        let agent = Agent::try_from(&kg_agent)?;
+        assert_eq!(agent.tools, Agent::default().tools);
+
+        Ok(())
+    }
+}
