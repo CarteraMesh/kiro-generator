@@ -37,7 +37,7 @@ pub struct KdlAgentFileDoc {
     #[facet(kdl::children, default)]
     pub(super) resources: Vec<GenericItem>,
 
-    #[facet(kdl::property, default)]
+    #[facet(kdl::child, default)]
     pub include_mcp_json: Option<bool>,
 
     #[facet(kdl::child, rename = "tools", default)]

@@ -12,11 +12,15 @@ use {
     tracing::enabled,
 };
 
-pub fn print_error(color: &ColorOverride, e: &facet_kdl::KdlDeserializeError) {
-    let mut output = String::new();
-    let handler = GraphicalReportHandler::new_themed(GraphicalTheme::unicode());
-    handler.render_report(&mut output, e).unwrap();
-    eprintln!("{}", output);
+pub fn print_error(e: &crate::Error) {
+    match e {
+        crate::Error::DeserializeError(file, kdl_err) => {
+            let mut output = String::new();
+            let handler = GraphicalReportHandler::new_themed(GraphicalTheme::unicode());
+            handler.render_report(&mut output, kdl_err).unwrap();
+            eprintln!("{}\nFile location: '{}'", output, file);
+        }
+    };
 }
 
 /// Override the color setting. Default is [`ColorOverride::Auto`].

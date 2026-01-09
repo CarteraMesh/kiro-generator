@@ -1,6 +1,7 @@
 mod agent;
 mod commands;
 mod config;
+mod error;
 mod generator;
 // mod kdl;
 mod os;
@@ -8,7 +9,6 @@ pub mod output;
 mod schema;
 mod source;
 
-pub use miette::miette as format_err;
 use {
     crate::{generator::Generator, os::Fs},
     clap::Parser,
@@ -18,6 +18,7 @@ use {
     tracing_error::ErrorLayer,
     tracing_subscriber::prelude::*,
 };
+pub use {error::Error, miette::miette as format_err};
 pub type Result<T> = miette::Result<T>;
 
 pub(crate) const DOCS_URL: &str = "https://kg.cartera-mesh.com";

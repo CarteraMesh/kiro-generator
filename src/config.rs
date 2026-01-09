@@ -10,7 +10,7 @@ use {
     crate::Fs,
     facet::Facet,
     facet_kdl as kdl,
-    miette::{GraphicalReportHandler, GraphicalTheme, IntoDiagnostic},
+    miette::IntoDiagnostic,
     std::{
         collections::{HashMap, HashSet},
         fmt::{Debug, Display},
@@ -58,14 +58,6 @@ impl AsRef<HashSet<String>> for GenericSet {
     }
 }
 
-// #[cfg(test)]
-// impl GenericSet {
-//     #[cfg(test)]
-//     fn len(&self) -> usize {
-//         self.item.len()
-//     }
-// }
-
 #[derive(Facet, Debug, Default, PartialEq, Clone, Eq)]
 #[facet(default)]
 pub(super) struct GenericVec {
@@ -94,6 +86,7 @@ impl From<GenericVec> for HashMap<String, String> {
     }
 }
 
+#[cfg(test)]
 impl GenericVec {
     fn len(&self) -> usize {
         self.item.len()
@@ -117,7 +110,7 @@ fn print_error(e: &facet_kdl::KdlDeserializeError) {
     // let d = e.into_diagnostics();
     eprintln!("\n=== Miette render ===");
     let mut output = String::new();
-    let handler = GraphicalReportHandler::new_themed(GraphicalTheme::unicode());
+    let handler = miette::GraphicalReportHandler::new_themed(miette::GraphicalTheme::unicode());
     handler.render_report(&mut output, e).unwrap();
     eprintln!("{}", output);
 }
@@ -138,7 +131,15 @@ where
     if fs.exists(&path) {
         match fs.read_to_string_sync(&path).into_diagnostic() {
             Err(e) => Some(Err(e)),
-            Ok(content) => Some(kdl::from_str(&content).into_diagnostic()),
+            Ok(content) => match kdl::from_str::<T>(&content) {
+                Err(e) => {
+                    let kdl_err =
+                        &crate::Error::DeserializeError(path.as_ref().display().to_string(), e);
+                    crate::output::print_error(kdl_err);
+                    Some(Err(crate::format_err!("{kdl_err}")))
+                }
+                Ok(r) => Some(Ok(r)),
+            },
         }
     } else {
         None
@@ -245,7 +246,7 @@ mod tests {
 
                 native-tool {
                    write {
-                       allow "./src/*" 
+                       allow "./src/*"
                        allow "./scripts/**"
                        deny  "Cargo.lock"
                        override "/tmp"

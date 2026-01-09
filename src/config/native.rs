@@ -24,9 +24,30 @@ macro_rules! define_tool {
 
         impl $name {
             pub fn merge(mut self, other: Self) -> Self {
-                self.allows.extend(other.allows);
-                self.denies.extend(other.denies);
-                self.overrides.extend(other.overrides);
+                if !other.allows.is_empty() {
+                    tracing::trace!(
+                        tool = stringify!($name),
+                        count = other.allows.len(),
+                        "merging allows"
+                    );
+                    self.allows.extend(other.allows);
+                }
+                if !other.denies.is_empty() {
+                    tracing::trace!(
+                        tool = stringify!($name),
+                        count = other.denies.len(),
+                        "merging denies"
+                    );
+                    self.denies.extend(other.denies);
+                }
+                if !other.overrides.is_empty() {
+                    tracing::trace!(
+                        tool = stringify!($name),
+                        count = other.overrides.len(),
+                        "merging overrides"
+                    );
+                    self.overrides.extend(other.overrides);
+                }
                 self.disable_auto_readonly =
                     self.disable_auto_readonly.or(other.disable_auto_readonly);
                 self.deny_by_default = self.deny_by_default.or(other.deny_by_default);
@@ -112,28 +133,6 @@ impl From<NativeToolsDoc> for NativeTools {
             aws: value.aws.into(),
             read: value.read.into(),
             write: value.write.into(),
-        }
-    }
-}
-
-#[derive(Facet, Debug, Clone, Default, PartialEq, Eq)]
-pub struct GenericList {
-    #[facet(kdl::arguments)]
-    pub list: Vec<String>,
-}
-
-impl From<&'static str> for GenericList {
-    fn from(value: &'static str) -> Self {
-        Self {
-            list: vec![value.to_string()],
-        }
-    }
-}
-
-impl FromIterator<&'static str> for GenericList {
-    fn from_iter<T: IntoIterator<Item = &'static str>>(iter: T) -> Self {
-        Self {
-            list: iter.into_iter().map(|f| f.to_string()).collect(),
         }
     }
 }

@@ -1,6 +1,5 @@
 mod custom_tool;
 pub mod hook;
-mod mcp_config;
 pub mod tools;
 pub const DEFAULT_AGENT_RESOURCES: &[&str] = &["file://README.md", "file://AGENTS.md"];
 pub const DEFAULT_APPROVE: [&str; 0] = [];
@@ -16,7 +15,6 @@ use {
 };
 pub use {
     custom_tool::{CustomToolConfig, tool_default_timeout},
-    mcp_config::McpServerConfig,
     tools::*,
 };
 
@@ -37,7 +35,7 @@ pub struct Agent {
     pub prompt: Option<String>,
     /// Configuration for Model Context Protocol (MCP) servers
     #[serde(default)]
-    pub mcp_servers: McpServerConfig,
+    pub mcp_servers: HashMap<String, CustomToolConfig>,
     /// List of tools the agent can see. Use \"@{MCP_SERVER_NAME}/tool_name\" to
     /// specify tools from mcp servers. To include all tools from a server,
     /// use \"@{MCP_SERVER_NAME}\"
@@ -170,9 +168,7 @@ impl TryFrom<&KdlAgent> for Agent {
             name: value.name.clone(),
             description: value.description.clone(),
             prompt: value.prompt.clone(),
-            mcp_servers: McpServerConfig {
-                mcp_servers: value.mcp.clone(),
-            },
+            mcp_servers: value.mcp.clone(),
             tools: if tools.is_empty() {
                 default_agent.tools
             } else {

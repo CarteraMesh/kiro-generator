@@ -39,9 +39,8 @@ mod tests {
                description "I am a child"
                resource "file://child.md"
                resource "file://README.md"
-               inherit "parent"
-               tool "@awsdocs"
-               tool "shell"
+               inherits "parent"
+               tools "@awsdocs" "shell"
                native-tool {
                   write {
                     overrides  "Cargo.lock"
@@ -63,11 +62,10 @@ mod tests {
                description "I am parent"
                 resource "file://parent.md"
                 resource "file://README.md"
-                tool "web_search"
-                tool "shell"
+                tools "web_search" "shell"
                 prompt "i tell you what to do"
                 model "claude"
-                allowed-tool "write"
+                allowed-tools "write"
                 alias "execute_bash" "shell"
                 alias "fs_read" "read"
                 native-tool {
@@ -79,7 +77,7 @@ mod tests {
                        allows "./src/*"  "./scripts/**"
                        denies "Cargo.lock"
                    }
-               
+
                   shell {
                       allows "git status .*" "git pull .*"
                       denies "git push .*"

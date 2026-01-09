@@ -19,8 +19,25 @@ native-tool {
         denies ".*Cargo.toml.*"
     }
     shell {
-        allows "git status" "git fetch" "git diff .*" "git pull.*" "yarn.*" "pulumi preview .*" "pdf2.*" "ps .*" "timeout.*" "pgrep.*"
-        denies "git commit .*" "git push .*" "kubectl .*delete*" ".*delete.*" "pulumi up.*" "^rm .*" ".*destroy.*" ".*rollout.*" ".*kill.*"
+        allows "git status" \
+            "git fetch" \
+            "git diff .*" \
+            "git pull.*" \
+            "yarn.*" \
+            "pulumi preview .*" \
+            "pdf2.*" \
+            "ps .*" \
+            "timeout.*" \
+            "pgrep.*"
+        denies "git commit .*" \
+            "git push .*" \
+            "kubectl .*delete*" \
+            ".*delete.*" \
+            "pulumi up.*" \
+            "^rm .*" \
+            ".*destroy.*" \
+            ".*rollout.*" \
+            ".*kill.*"
     }
 }
 mcp rustdocs {

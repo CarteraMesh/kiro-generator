@@ -70,89 +70,91 @@ impl Generator {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use {super::*, serde_yaml2::to_string};
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     #[tokio::test]
-//     #[test_log::test]
-//     async fn test_merge_inheritance_chain() -> Result<()> {
-//         let fs = Fs::new();
-//         let generator = Generator::new(
-//             fs,
-//             ConfigLocation::Local,
-//             crate::output::OutputFormat::Table(true),
-//         )?;
+    #[tokio::test]
+    #[test_log::test]
+    async fn test_merge_inheritance_chain() -> Result<()> {
+        let fs = Fs::new();
+        let generator = Generator::new(
+            fs,
+            ConfigLocation::Local,
+            crate::output::OutputFormat::Table(true),
+        )?;
 
-//         let merged = generator.merge()?;
-//         assert_eq!(merged.len(), 3);
+        let merged = generator.merge()?;
+        assert_eq!(merged.len(), 3);
 
-//         // Find dependabot agent
-//         let dependabot = merged
-//             .iter()
-//             .find(|a| a.name == "dependabot")
-//             .expect("dependabot agent not found");
+        // Find dependabot agent
+        let dependabot = merged
+            .iter()
+            .find(|a| a.name == "dependabot")
+            .expect("dependabot agent not found");
 
-//         // Verify inheritance chain was resolved: dependabot -> aws-test ->
-// base         assert_eq!(dependabot.description(), "asds");
+        // Verify inheritance chain was resolved: dependabot -> aws-test -> base
+        assert_eq!(
+            dependabot.description.clone().unwrap_or_default(),
+            "I make life painful for developers"
+        );
 
-//         // Should have prompt from aws-test
-//         assert_eq!(dependabot.prompt(), "you are an AWS expert".to_string());
+        // Should have prompt from aws-test
+        assert_eq!(
+            dependabot.prompt.clone().unwrap_or_default(),
+            "you are an AWS expert".to_string()
+        );
 
-//         // Should have tools from base
-//         let tools = dependabot.tools();
-//         assert!(tools.contains("*"));
+        // Should have tools from base
+        let tools = &dependabot.tools;
+        assert!(tools.contains("*"));
 
-//         // Should have allowed_tools merged from base and aws-test
-//         let allowed = dependabot.allowed_tools();
-//         assert!(allowed.contains("read"));
-//         assert!(allowed.contains("knowledge"));
-//         assert!(allowed.contains("@fetch"));
-//         assert!(allowed.contains("@awsdocs"));
+        // Should have allowed_tools merged from base and aws-test
+        let allowed = &dependabot.allowed_tools;
+        assert!(allowed.contains("read"));
+        assert!(allowed.contains("knowledge"));
+        assert!(allowed.contains("fetch"));
+        assert!(allowed.contains("@awsdocs"));
 
-//         // Should have resources from all three
-//         let resources: Vec<String> = dependabot.resources().map(|s|
-// s.to_string()).collect();         assert!(resources.contains(&"file://README.md".to_string()));
-//         assert!(resources.contains(&"file://AGENTS.md".to_string()));
-//         assert!(resources.contains(&"file://.amazonq/rules/**/*.md".to_string()));
+        // Should have resources from all three
+        let resources = &dependabot.resources;
+        assert!(resources.contains(&"file://README.md".to_string()));
+        assert!(resources.contains(&"file://AGENTS.md".to_string()));
+        assert!(resources.contains(&"file://.amazonq/rules/**/*.md".to_string()));
 
-//         // Should have hooks from all levels
-//         let hooks = dependabot.hooks();
-//         assert!(hooks.contains_key(&
-// crate::agent::hook::HookTrigger::AgentSpawn));
+        // Should have hooks from all levels
+        let hooks = &dependabot.hook;
+        assert!(
+            !hooks
+                .hooks(&crate::agent::hook::HookTrigger::AgentSpawn)
+                .is_empty()
+        );
 
-//         // Should have force permissions from dependabot overriding denies
-// from base         let shell = dependabot.get_tool_shell();
-//         let overrides = shell.override_commands();
-//         assert!(overrides.contains(&"git commit .*".into()));
-//         assert!(overrides.contains(&"git push .*".into()));
+        // Should have force permissions from dependabot overriding denies from base
+        let shell = dependabot.get_tool_shell();
+        let overrides = &shell.overrides;
+        assert!(overrides.contains("git commit .*"));
+        assert!(overrides.contains("git push .*"));
 
-//         let read = dependabot.get_tool_read();
-//         let overrides = read.override_paths();
-//         assert!(overrides.contains(&".*Cargo.toml.*".into()));
+        let read = dependabot.get_tool_read();
+        let overrides = &read.overrides;
+        assert!(overrides.contains(".*Cargo.toml.*"));
 
-//         let write = dependabot.get_tool_write();
-//         let overrides = read.override_paths();
-//         assert!(overrides.contains(&".*Cargo.toml.*".into()));
+        let write = dependabot.get_tool_write();
+        let overrides = &write.overrides;
+        assert!(overrides.contains(".*Cargo.toml.*"));
 
-//         // Should have aws tool from aws-test
-//         let aws = dependabot.get_tool_aws();
+        // Should have aws tool from aws-test
+        let aws = dependabot.get_tool_aws();
 
-//         assert!(
-//             aws.allow
-//                 .unwrap_or_default()
-//                 .list
-//                 .iter()
-//                 .any(|i| i == "ec2")
-//         );
-//         assert!(aws.allow.unwrap_or_default().list.iter().any(|i| i ==
-// "s3"));         assert!(aws.deny.unwrap_or_default().list.iter().any(|i| i ==
-// "iam"));
+        assert_eq!(2, aws.allows.len());
+        assert!(aws.allows.contains("ec2"));
+        assert!(aws.allows.contains("s3"));
 
-//         // check try_from
-//         let results = generator.write_all(true).await?;
-//         assert!(!results.is_empty());
+        // check try_from
+        let results = generator.write_all(true).await?;
+        assert!(!results.is_empty());
 
-//         Ok(())
-//     }
-// }
+        Ok(())
+    }
+}
